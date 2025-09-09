@@ -2,6 +2,11 @@
 
 Open Source service for privacy-preserving lost-and-found via QR tags with anonymous first contact, optional chat relay, and status-driven notifications.
 
+> ⚠️ This project is in early development (“DRAFT” / “Work in Progress”).  
+> Features, APIs, and architecture may change at any time.  
+> Feedback welcome – privacy & security are top priorities!
+
+
 ## 🎯 Key Features
 - Anonymous first contact with optional location sharing (consent-driven)
 - Owner login only for managing tags and replies (minimal data collection)
