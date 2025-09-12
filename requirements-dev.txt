@@ -1,0 +1,4 @@
+-r infra/requirements.txt
+pytest
+pylint
+moto
