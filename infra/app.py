@@ -1,28 +1,38 @@
 #!/usr/bin/env python3
-import os
 
+import os
 import aws_cdk as cdk
 
-from app.app_stack import AppStack
+from infra.stacks import (
+    ApiStackResources,
+    ApiStack,
+    UIStack,
+    OwnerStack,
+    SessionStack,
+    TagStack,
+)
 
+stage = os.getenv("STAGE", "dev")  # Default 'dev'
+region = os.getenv("CDK_DEFAULT_REGION", "eu-central-1")
+account = os.getenv("CDK_DEFAULT_ACCOUNT", "123456789012")
+
+env = cdk.Environment(account=account, region=region)
 
 app = cdk.App()
-AppStack(app, "AppStack",
-    # If you don't specify 'env', this stack will be environment-agnostic.
-    # Account/Region-dependent features and context lookups will not work,
-    # but a single synthesized template can be deployed anywhere.
 
-    # Uncomment the next line to specialize this stack for the AWS Account
-    # and Region that are implied by the current CLI configuration.
+owner = OwnerStack(scope=app, construct_id=f"LostAndFoundOwnerStack-{stage}", env=env, stage=stage)
+session = SessionStack(scope=app, construct_id=f"LostAndFoundSessionStack-{stage}", env=env, stage=stage)
+tags = TagStack(scope=app, construct_id=f"LostAndFoundTagStack-{stage}", env=env, stage=stage)
 
-    #env=cdk.Environment(account=os.getenv('CDK_DEFAULT_ACCOUNT'), region=os.getenv('CDK_DEFAULT_REGION')),
+resources_bag = ApiStackResources(
+    owner_table=owner.owner_table,
+    tag_table=tags.tag_table,  # Not used in API stack
+    owner_session_table=session.session_table,
+    finder_session_table=session.finder_session_table,
+)
 
-    # Uncomment the next line if you know exactly what Account and Region you
-    # want to deploy the stack to. */
+api = ApiStack(scope=app, construct_id=f"LostAndFoundApiStack-{stage}", env=env, resources_bag=resources_bag, stage=stage)
 
-    #env=cdk.Environment(account='123456789012', region='us-east-1'),
-
-    # For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html
-    )
+ui = UIStack(scope=app, construct_id=f"LostAndFoundUIStack-{stage}", env=env, stage=stage)
 
 app.synth()
