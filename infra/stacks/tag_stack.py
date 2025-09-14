@@ -7,6 +7,7 @@ from aws_cdk.aws_dynamodb import (Table, Attribute, AttributeType, BillingMode)
 
 
 class TagStack(Stack):
+    """Tag Stack with DynamoDB table for QR tags."""
 
     def __init__(self, scope, construct_id, stage="dev", **kwargs):
         super().__init__(scope, construct_id, **kwargs)

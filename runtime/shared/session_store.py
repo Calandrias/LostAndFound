@@ -1,0 +1,162 @@
+"""Shared session handler functions."""
+import secrets
+import os
+from typing import TYPE_CHECKING, Optional, TypeVar, Type, Any
+
+import boto3
+from pydantic import ValidationError, BaseModel
+from botocore.exceptions import ClientError
+
+from runtime.shared.session_model import OwnerSession, VisitorSession
+from runtime.shared.shared_helper import dynamodb_decimal_to_int, current_unix_timestamp_utc
+
+from runtime.shared.logging_utils import ProjectLogger
+
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.service_resource import Table, DynamoDBServiceResource
+
+DEFAULT_OWNER_SESSION_DURATION = 1 * 60 * 60  # 1 hour
+DEFAULT_VISITOR_SESSION_DURATION = 8 * 60 * 60  # 8 hours
+
+logger = ProjectLogger(__name__).get_logger()
+# ------------------------
+# Exception Hierarchy
+# ------------------------
+
+
+class SessionError(Exception):
+    """Base error for all session-related exceptions."""
+
+
+class SessionCreateError(SessionError):
+    """Raised when session creation fails."""
+
+
+class SessionRetrieveError(SessionError):
+    """Raised when session retrieval fails."""
+
+
+class SessionDeleteError(SessionError):
+    """Raised when session deletion fails."""
+
+
+# ------------------------
+# Base Helper
+# ------------------------
+
+T = TypeVar('T', bound=BaseModel)
+
+
+class SessionHelperBase:
+    """Base logic for session helpers."""
+
+    def __init__(self, table_name: str, ddb_resource: Optional[Any] = None):
+        self.table_name = table_name
+        self.ddb: DynamoDBServiceResource = ddb_resource or boto3.resource("dynamodb")
+        self.table: Table = self.ddb.Table(self.table_name)
+
+    def delete_session(self, session_token: str) -> None:
+        """Delete a session by its token."""
+        try:
+            self.table.delete_item(Key={"session_token": session_token})
+        except ClientError as e:
+            raise SessionDeleteError("Failed to delete session (database error).") from e
+        except Exception as e:  #pylint: disable=broad-except
+            raise SessionDeleteError("Unexpected error during session deletion.") from e
+
+    def get_session(self, session_token: str, model: Type[T]) -> Optional[T]:
+        """ Retrieve and validate a session by its token."""
+        try:
+            response = self.table.get_item(Key={"session_token": session_token})
+            item = response.get("Item")
+            if item:
+                item = dynamodb_decimal_to_int(item)  # Convert DynamoDB Decimals to int
+
+            return model.model_validate(item) if item else None
+        except (ClientError, ValidationError) as e:
+            raise SessionRetrieveError("Failed to load session.") from e
+        except Exception as e:  #pylint: disable=broad-except
+            raise SessionRetrieveError("Unknown error during session lookup.") from e
+
+    def create_session_token(self) -> str:
+        """ Generate a unique session token."""
+        prefix = "sessiontok_"
+        session_token = (prefix + secrets.token_urlsafe(64))[:86]  # 86 chars total
+        logger.debug(f"Generated session token: {session_token}, length: {len(session_token)}")
+        return session_token
+
+
+# ------------------------
+# Owner Session Helper
+# ------------------------
+
+DEFAULT_OWNER_SESSION_DURATION = 1 * 60 * 60  # 1 hour
+
+
+class OwnerSessionHelper(SessionHelperBase):
+
+    def __init__(self, table_name: Optional[str] = None, ddb_resource: Optional[Any] = None):
+        super().__init__(table_name or os.environ.get("OWNER_SESSION_TABLE_NAME", "LostAndFound-OwnerSession"), ddb_resource=ddb_resource)
+
+    def create_owner_session(self, owner_hash: str, duration_seconds: int = DEFAULT_OWNER_SESSION_DURATION, onetime=False) -> OwnerSession:
+        """ Create a new owner session with a unique token and expiration."""
+
+        session_token = self.create_session_token()
+        logger.debug(f"Generated session token: {session_token}, length: {len(session_token)}")
+        current_time = current_unix_timestamp_utc()
+        expires_at = current_time + duration_seconds
+        session = OwnerSession(
+            session_token=session_token,
+            owner_hash=owner_hash,
+            created_at=current_time,
+            expires_at=expires_at,
+            onetime=onetime,
+        )
+        try:
+            self.table.put_item(Item=session.model_dump())
+            return session
+        except (ClientError, ValidationError) as e:
+            raise SessionCreateError("Failed to create owner session.") from e
+        except Exception as e:  #pylint: disable=broad-except
+            raise SessionCreateError("Unexpected error during owner session creation.") from e
+
+    def get_owner_session(self, session_token: str) -> Optional[OwnerSession]:
+        """ Retrieve and validate an owner session by its token."""
+        return self.get_session(session_token, OwnerSession)
+
+
+# ------------------------
+# Visitor Session Helper
+# ------------------------
+
+DEFAULT_VISITOR_SESSION_DURATION = 8 * 60 * 60  # 8 hours
+
+
+class VisitorSessionHelper(SessionHelperBase):
+    """ Helper for managing visitor sessions."""
+
+    def __init__(self, table_name: Optional[str] = None, ddb_resource: Optional[Any] = None):
+        super().__init__(table_name or os.environ.get("VISITOR_SESSION_TABLE_NAME", "LostAndFound-VisitorSession"), ddb_resource=ddb_resource)
+
+    def create_visitor_session(self, tag_code: str, duration_seconds: int = DEFAULT_VISITOR_SESSION_DURATION) -> VisitorSession:
+        """ Create a new visitor session with a unique token and expiration."""
+        session_token = self.create_session_token()
+        current_time = current_unix_timestamp_utc()
+        expires_at = current_time + duration_seconds
+        session = VisitorSession(
+            session_token=session_token,
+            tag_code=tag_code,
+            created_at=current_time,
+            expires_at=expires_at,
+        )
+        try:
+            self.table.put_item(Item=session.model_dump())
+            return session
+        except (ClientError, ValidationError) as e:
+            raise SessionCreateError("Failed to create visitor session.") from e
+        except Exception as e:  #pylint: disable=broad-except
+            raise SessionCreateError("Unexpected error during visitor session creation.") from e
+
+    def get_visitor_session(self, session_token: str) -> Optional[VisitorSession]:
+        """ Retrieve and validate a visitor session by its token."""
+        return self.get_session(session_token, VisitorSession)

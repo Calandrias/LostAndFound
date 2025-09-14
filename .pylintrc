@@ -1,2 +1,6 @@
 [FORMAT]
 max-line-length=180
+
+[MESSAGES CONTROL]
+disable=logging-fstring-interpolation
+

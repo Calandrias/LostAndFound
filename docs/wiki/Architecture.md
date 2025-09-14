@@ -11,13 +11,17 @@
 ├── frontend/          # Astro app (chat island, landing pages), static build artifacts
 ├── runtime/
 │   ├── public/        # finder-facing Lambdas (message create, session handling)
-│   ├── admin/         # owner-facing Lambdas (reply, status, preferences)
-│   └── shared/        # common utils, schema validation, auth middleware
-├── infra/             # IaC (CDK) stacks: api, auth, data, web, optional sfn
+│   ├── owner/         # owner-facing Lambdas (reply, status, preferences)
+│   ├── shared/        # common utils, schema validation, auth middleware
+│   └── admin/         # admin-facing Lambdas (auditing, configuration, performance logs)
+├── infra/
+│   ├── stacks         # cdk stacks, split by responsibility zones (ui, )
 ├── docs/
 │   ├── wiki/          # project documentation (this)
 │   └── adr/           # ADRs and architectural docs (docs-as-code)
 └── .github/workflows/ # CI/CD pipelines
+
+ 
 ```
 
 ## Data model (DynamoDB)

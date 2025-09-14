@@ -1,3 +1,4 @@
+"""API Stack definition."""
 from pathlib import Path
 from typing import cast
 from dataclasses import dataclass
@@ -31,6 +32,7 @@ class ApiStackResources:
 
 
 class AttrDict(dict):
+    """A dictionary that allows attribute-style access."""
 
     def __getattr__(self, key):
         return self[key]
@@ -40,6 +42,7 @@ class AttrDict(dict):
 
 
 class ApiStack(Stack):
+    """API stack with Lambda functions, ApiGateway and Permissions."""
 
     def __init__(self, scope: Construct, construct_id: str, resources_bag: ApiStackResources, stage="dev", **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
