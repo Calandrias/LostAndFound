@@ -1,12 +1,12 @@
 """Pydantic model for Owner data with validation."""
-
+from typing import ClassVar, Set
 from enum import Enum
 from pydantic import BaseModel, Field, StrictStr, StrictInt, ConfigDict
 
 from shared.identifier_model import owner_hash_field
 
 
-class Status(Enum):
+class Status(str, Enum):
     """Enumeration for owner status."""
     ACTIVE = 'active'
     BLOCKED = 'blocked'
@@ -55,7 +55,4 @@ class Owner(BaseModel):
     created_at: StrictInt = Field(description="Unix timestamp when the owner was created")
     status: Status = Field(default=Status.ONBOARDING, description="Owner account status flag: active, blocked, ongoing onboarding or pending deletion")
 
-
-if __name__ == "__main__":
-    from runtime.shared.modeldump import dump_to_file  # pylint: disable=import-error # only for local doc generation
-    dump_to_file(Owner)
+    ALLOWED_UPDATE_FIELDS: ClassVar[Set[str]] = {"status", "random_entropy", "public_key", "password_hash"}

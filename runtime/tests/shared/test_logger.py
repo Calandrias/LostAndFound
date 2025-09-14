@@ -1,57 +1,166 @@
-"""Tests for logging utilities, including token masking and log level behavior."""
-from runtime.shared.logging_utils import ProjectLogger
+"""Tests for logging utilities with identifier prefix masking, strict loglevel policy and memory handler for output capturing."""
+
+import os
+import logging
+import pytest
+import random
+import io
+
+from runtime.shared.logging_utils import ProjectLogger, SanitizingFormatter
 
 
-def test_sanitize_token_masking():
-    test_cases = [
-        ("afed1385efhabc", "a>len=14<c"),
-        ("sessiontok_eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", "s>len=43<9"),  # JWT-artig
-        ("f3e39e3a1d28bb9bf9891f37aeccdfea", "f>len=32<a"),  # typical hash
-        ("owner_1234567890123456789012345", "o>len=27<5"),  # owner_hash
-        ("abcd", "a>len=4<d"),  # minimal Masking
-        ("xyz", "xyz"),  # too short, unchanged
-    ]
-    for orig, expected in test_cases:
-        masked = ProjectLogger.sanitize(orig)
-        assert masked[0] == orig[0]
-        assert masked[-1] == orig[-1]
-        assert ">len=" in masked or masked == orig
-        # Optionally, ensure that the length marker matches expected value
-        if masked != orig:
-            assert f">len={len(orig)}<" in masked
+def random_logger() -> str:
+    return "TestLogger_" + str(random.randint(0, 99999))
 
 
-def test_logger_level_dependency(monkeypatch, capsys):
-    # Stage "prod" and LOG_LEVEL "DEBUG" => should fall back to INFO (no debug)
+def attach_memory_handler(logger):
+    """Attach a fresh StreamHandler(StringIO) and return its buffer."""
+    stream = io.StringIO()
+    for h in list(logger.handlers):
+        logger.removeHandler(h)
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(SanitizingFormatter('[%(levelname)s] %(asctime)s %(name)s: %(message)s'))
+    logger.addHandler(handler)
+    return stream
+
+
+@pytest.mark.parametrize(
+    "value,should_mask,prefix",
+    [
+        ("owner_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", True, "owner_"),
+        ("tag_ABCDEFGHJKLMNOPQRSTU", True, "tag_"),
+        ("sessiontok_123456789012345678901234567890ABCDEFG", True, "sessiontok_"),
+        ("owner_000", False, "owner_"),  # too short
+        ("tag_XYZ12", False, "tag_"),
+        ("sessiontok_123", False, "sessiontok_"),
+        ("notanid_ABCD1234", True, None),
+        ("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9abcdefghi", True, None),
+        ("abcd", False, None),
+        ("", False, None),
+        ("12345", False, None),
+    ])
+def test_sanitize_identifier_patterns_and_prefixes(value, should_mask, prefix):
+    masked = ProjectLogger.sanitize(value)
+    if should_mask and prefix:
+        assert masked.startswith(prefix)
+        assert ">len=" in masked
+        assert masked[len(prefix)] == value[len(prefix)]
+        assert masked[-1] == value[-1]
+        assert masked != value
+    elif should_mask:
+        assert ">len=" in masked
+        assert masked != value
+    else:
+        assert masked == value
+
+
+def test_sanitizing_formatter_unicode_and_prefix():
+    formatter = SanitizingFormatter()
+    examples = ["MyÜñîcødé ✨ owner_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "foo tag_ABCDEFGHJKLMNOPQRSTU", "X sessiontok_123456789012345678901234567890ABCDEFG Z"]
+    for msg in examples:
+        record = logging.LogRecord(name="test", level=logging.INFO, pathname=__file__, lineno=1, msg=msg, args=(), exc_info=None, func=None)
+        formatted = formatter.format(record)
+        assert ">len=" in formatted
+
+
+def test_logger_level_dependency(monkeypatch):
+    logger_name = random_logger()
     monkeypatch.setenv("STAGE", "prod")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
-    logger = ProjectLogger("TestLogger1").get_logger()
-    logger.debug("hidden debug message %s", "tok123456789xyz")
-    logger.info("public info %s", "tok123456789xyz")
-    out = capsys.readouterr().out + capsys.readouterr().err
-    assert "public info" in out
-    assert "tok>len=" in out  # Masking in action!
-    assert "hidden debug" not in out
+    logger = ProjectLogger(logger_name).get_logger()
+    stream = attach_memory_handler(logger)
+    logger.debug("hidden debug message %s", "owner_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+    logger.info("public info %s", "owner_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+    log_output = stream.getvalue()
+    assert "public info" in log_output
+    assert ">len=" in log_output
+    assert "hidden debug" not in log_output
 
-    # Both "dev" and "DEBUG" => debug should show!
+    logger_name2 = random_logger()
     monkeypatch.setenv("STAGE", "dev")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
-    logger2 = ProjectLogger("TestLogger2").get_logger()
-    logger2.debug("debug msg %s", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.abcdefghi")
-    out = capsys.readouterr().out + capsys.readouterr().err
-    assert "debug msg" in out
-    # Should mask JWT/artige string
-    assert "e>len=" in out or "y>len=" in out
+    logger2 = ProjectLogger(logger_name2).get_logger()
+    stream2 = attach_memory_handler(logger2)
+    logger2.debug("debug msg %s", "tag_ABCDEFGHJKLMNOPQRSTU")
+    log_output2 = stream2.getvalue()
+    assert "debug msg" in log_output2
+    assert ">len=" in log_output2
 
 
-def test_logger_sanitizer_on_args(capsys):
-    logger = ProjectLogger("TestLogger3").get_logger()
-    # Test with plausible session token and owner hash
-    logger.info("Sensitive: %s %s", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", "f3e39e3a1d28bb9bf9891f37aeccdfea")
-    out = capsys.readouterr().out + capsys.readouterr().err
-    assert "Sensitive" in out
-    assert "e>len=" in out and "f>len=" in out
-    # Test that an unmasked short string remains intact
-    logger.info("Safe log: %s", "abc")
-    out = capsys.readouterr().out
-    assert "Safe log: abc" in out
+def test_logger_sanitizer_on_args_with_prefixes():
+    logger_name = random_logger()
+    logger = ProjectLogger(logger_name).get_logger()
+    stream = attach_memory_handler(logger)
+    logger.info("Sensitive: %s %s", "owner_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "sessiontok_123456789012345678901234567890ABCDEFG")
+    log_output = stream.getvalue()
+    assert "Sensitive" in log_output
+    assert log_output.count(">len=") >= 2
+    logger.info("Safe log: %s", "short")
+    safe_output = stream.getvalue()
+    assert "Safe log: short" in safe_output
+
+
+def test_logger_singleton_and_handler():
+    logger_name = random_logger()
+    loggerA = ProjectLogger(logger_name).get_logger()
+    loggerB = ProjectLogger(logger_name).get_logger()
+    assert loggerA is loggerB
+    loggerA.handlers.clear()
+    loggerC = ProjectLogger(logger_name).get_logger()
+    streamC = attach_memory_handler(loggerC)
+    loggerC.info("should show after clearing handlers: tag_ABCDEFGHJKLMNOPQRSTU")
+    outC = streamC.getvalue()
+    assert "should show after clearing handlers" in outC
+    assert ">len=" in outC
+
+
+def test_formatter_custom_pattern_for_qr_prefix():
+    pattern = r'\btag_[A-Za-z0-9]{8,}\b'
+    formatter = SanitizingFormatter(pattern=pattern)
+    teststring = "tag_ABCDEFGH tag_SHORT tag_ABCDEFGHIJKLMNOPQ"
+    masked = formatter.sanitize(teststring)
+    assert "tag_A>len=" in masked
+    assert masked.endswith("Q") or "<Q" in masked
+
+
+def test_formatter_args_tuple_with_owner_tag():
+    formatter = SanitizingFormatter()
+    record = logging.LogRecord(name="foo",
+                               level=logging.INFO,
+                               pathname=__file__,
+                               lineno=1,
+                               msg="tokens %s %s",
+                               args=("owner_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "tag_ABCDEFGHJK"),
+                               exc_info=None,
+                               func=None)
+    result = formatter.format(record)
+    assert "owner_A>len=" in result
+    assert "tag_A>len=" in result
+
+
+def test_logger_propagate_behavior():
+    logger_name = random_logger()
+    logger = ProjectLogger(logger_name).get_logger()
+    assert logger.propagate is False
+
+
+def test_project_logger_env_setup(monkeypatch):
+    logger_name = random_logger()
+    monkeypatch.setenv("STAGE", "prod")
+    monkeypatch.setenv("LOG_LEVEL", "DEBUG")
+    logger = ProjectLogger(logger_name).get_logger()
+    assert logger.level == logging.INFO  # INFO is 20
+
+    logger_name2 = random_logger()
+    monkeypatch.setenv("STAGE", "dev")
+    monkeypatch.setenv("LOG_LEVEL", "DEBUG")
+    logger2 = ProjectLogger(logger_name2).get_logger()
+    assert logger2.level == logging.DEBUG  # DEBUG is 10
+
+
+def test_sanitize_staticmethod_public_with_tag_owner():
+    val1 = "owner_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    val2 = "tag_ABCDEFGHJKLMNOPQRSTU"
+    val3 = "sessiontok_123456789012345678901234567890ABCDEFG"
+    for val in (val1, val2, val3):
+        assert ProjectLogger.sanitize(val) == SanitizingFormatter().sanitize(val)

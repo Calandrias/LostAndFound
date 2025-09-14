@@ -1,8 +1,30 @@
 import os
+import sys
 import logging
 import re
 
 SENSITIVE_PATTERN = re.compile(r'\b([a-fA-F0-9]{8,}|[A-Za-z0-9\-_]{12,}|eyJ[A-Za-z0-9\-_]{20,})\b')
+PROTECTED_PREFIXES = ("owner_", "tag_", "sessiontok_")
+
+
+def mask_sensitive_patterns(text: str) -> str:
+    """Sanitize all sensitive owner/tag/session identifiers in given text."""
+
+    def replacer(match):
+        word = match.group(0)
+        for prefix in PROTECTED_PREFIXES:
+            if word.startswith(prefix):
+                suffix = word[len(prefix):]
+                if len(suffix) > 3:
+                    masked_suffix = f"{suffix[0]}>len={len(suffix)}<{suffix[-1]}"
+                    return prefix + masked_suffix
+                else:
+                    return word
+        if len(word) < 4:
+            return word
+        return f"{word[0]}>len={len(word)}<{word[-1]}"
+
+    return SENSITIVE_PATTERN.sub(replacer, text)
 
 
 class SanitizingFormatter(logging.Formatter):
@@ -15,14 +37,7 @@ class SanitizingFormatter(logging.Formatter):
 
     def sanitize(self, text: str) -> str:
         """ Replace sensitive patterns in the text with a masked version."""
-
-        def replacer(match):
-            word = match.group(0)
-            if len(word) < 4:
-                return word
-            return f"{word[0]}>len={len(word)}<{word[-1]}"
-
-        return self.sensitive_pattern.sub(replacer, text)
+        return mask_sensitive_patterns(text)
 
     def format(self, record):
         # Mask message and args
@@ -55,23 +70,23 @@ class ProjectLogger:
 
             # Env-based config
             stage = os.getenv("STAGE", "prod").lower()
-            debug_env = os.getenv("LOG_LEVEL", "INFO").upper()
-            if debug_env == "DEBUG" and stage == "dev":
-                self.logger.setLevel(logging.DEBUG)
+            log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+            # In prod, enforce at least INFO (never DEBUG/TRACE!)
+
+            allowed_levels = {"INFO", "WARNING", "ERROR", "CRITICAL"}
+            # Dev: allow ANY level
+            if stage == "dev":
+                self.logger.setLevel(getattr(logging, log_level, logging.INFO))
+            # All others: only allow INFO or stricter (no DEBUG or lower)
             else:
-                self.logger.setLevel(getattr(logging, debug_env, logging.INFO))
+                if log_level in allowed_levels:
+                    self.logger.setLevel(getattr(logging, log_level))
+                else:
+                    self.logger.setLevel(logging.INFO)
 
     def get_logger(self):
         return self.logger
 
     @staticmethod
     def sanitize(text: str) -> str:
-        pattern = SENSITIVE_PATTERN
-
-        def replacer(match):
-            word = match.group(0)
-            if len(word) < 4:
-                return word
-            return f"{word[0]}>len={len(word)}<{word[-1]}"
-
-        return pattern.sub(replacer, text)
+        return mask_sensitive_patterns(text)

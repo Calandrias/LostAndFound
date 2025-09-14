@@ -4,7 +4,7 @@ import os
 from typing import Optional, Any, Dict, TYPE_CHECKING
 
 import boto3
-from pydantic import ValidationError
+from pydantic import ValidationError, create_model
 from botocore.exceptions import ClientError
 
 from shared.owner_model import Owner, Status
@@ -16,32 +16,36 @@ if TYPE_CHECKING:
 
 logger = ProjectLogger(__name__).get_logger()
 
+# type: ignore[call-arg]
+# pylance: disable=reportCallIssue
+# Note: Linter false positive - Pydantic v2 dynamic create_model("TempModel", ...) works, but Pylance has missing dynamic typing support for this usage.
+
 
 class OwnerHelper:
     """Utility functions for working with Owner model (no DB, no crypto)."""
 
     @staticmethod
     def create_owner(  # pylint: disable=too-many-arguments
-            *,  # factory method, keywords only
-            owner_hash: str,
-            salt: str,
-            password_hash: str,
-            public_key: str,
-            random_entropy: str,
-            created_at: Optional[int] = None,
-            owner_encrypted_storage: Optional[str] = "",
-            status: Status = Status.ONBOARDING) -> Owner:
+        *,  # factory method, keywords only
+        owner_hash: str,
+        salt: str,
+        password_hash: str,
+        public_key: str,
+        random_entropy: str,
+        created_at: Optional[int] = None,
+        owner_encrypted_storage: Optional[str] = "",
+        status: Status = Status.ONBOARDING,
+    ) -> Owner:
         """Creates a validated Owner object from fields, raises ValidationError if invalid."""
-        return Owner(
-            owner_hash=owner_hash,
-            salt=salt,
-            password_hash=password_hash,
-            public_key=public_key,
-            random_entropy=random_entropy,
-            owner_encrypted_storage=owner_encrypted_storage or "",
-            created_at=created_at or current_unix_timestamp_utc(),
-            status=status,
-        )
+        _status = Status(status) if isinstance(status, str) else status
+        return Owner(owner_hash=owner_hash,
+                     salt=salt,
+                     password_hash=password_hash,
+                     public_key=public_key,
+                     random_entropy=random_entropy,
+                     owner_encrypted_storage=owner_encrypted_storage or "",
+                     created_at=created_at or current_unix_timestamp_utc(),
+                     status=_status)
 
     @staticmethod
     def is_active(owner: Owner) -> bool:
@@ -103,7 +107,8 @@ class OwnerStore:
     def get_owner(self, owner_hash: str) -> Optional[Owner]:
         """Read all fields of an owner; returns validated Owner or None if not found."""
         try:
-            item = self.table.get_item(Key={"owner_hash": owner_hash})
+            response = self.table.get_item(Key={"owner_hash": owner_hash})
+            item = response.get("Item")
             if item:
                 item = dynamodb_decimal_to_int(item)  # Convert DynamoDB Decimals to int
             return Owner.model_validate(item) if item else None
@@ -149,6 +154,18 @@ class OwnerStore:
 
     def update_owner_field(self, owner_hash: str, field: str, value: Any):
         """Update a single field for an existing owner."""
+        if field not in Owner.ALLOWED_UPDATE_FIELDS:
+            raise ValidationError(f"field >{field}< not part of Owner")
+
+        field_info = Owner.model_fields[field]  # pylint: disable=E1136 # Owner.model_fields is dict and subscripting is safe
+        field_type = field_info.annotation
+
+        temp_model = create_model("TempModel", **{field: (field_type, ...)})
+        try:
+            temp_model.model_validate({field: value})
+        except ValidationError as e:
+            raise ValidationError(f"invalid value for field {field}") from e
+
         try:
             expr_names = {f"#{field}": field}
             resp = self.table.update_item(Key={"owner_hash": owner_hash},

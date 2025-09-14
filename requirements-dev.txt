@@ -1,4 +1,6 @@
 -r infra/requirements.txt
 pytest
+pytest-cov
+coverage
 pylint
 moto

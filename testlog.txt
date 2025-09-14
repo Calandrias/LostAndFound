@@ -1,0 +1,42 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.11, pytest-8.4.2, pluggy-1.6.0
+rootdir: /home/roland/LostAndFound
+configfile: pytest.ini
+plugins: typeguard-2.13.3, cov-7.0.0
+collected 28 items
+
+runtime/tests/shared/test_logger.py ....................                 [ 71%]
+runtime/tests/shared/test_owner_store.py ..                              [ 78%]
+runtime/tests/shared/test_session_store.py ......
+ERROR: Coverage failure: total of 81 is less than fail-under=90
+                                                                         [100%]
+
+=============================== warnings summary ===============================
+../../../usr/lib/python3/dist-packages/dateutil/tz/tz.py:37
+  /usr/lib/python3/dist-packages/dateutil/tz/tz.py:37: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+    EPOCH = datetime.datetime.utcfromtimestamp(0)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.12.11-final-0 _______________
+
+Name                                         Stmts   Miss  Cover
+----------------------------------------------------------------
+runtime/__init__.py                              0      0   100%
+runtime/shared/__init__.py                       0      0   100%
+runtime/shared/identifier_model.py              18      0   100%
+runtime/shared/logging_utils.py                 61      1    98%
+runtime/shared/owner_model.py                   20      0   100%
+runtime/shared/owner_store.py                  124     68    45%
+runtime/shared/response_model.py                11     11     0%
+runtime/shared/session_model.py                 15      0   100%
+runtime/shared/session_store.py                 82     16    80%
+runtime/shared/shared_helper.py                 22      7    68%
+runtime/tests/shared/test_logger.py            114      0   100%
+runtime/tests/shared/test_owner_store.py        43      4    91%
+runtime/tests/shared/test_session_store.py      66      0   100%
+----------------------------------------------------------------
+TOTAL                                          576    107    81%
+Coverage HTML written to dir htmlcov
+FAIL Required test coverage of 90% not reached. Total coverage: 81.42%
+======================== 28 passed, 1 warning in 4.08s =========================
