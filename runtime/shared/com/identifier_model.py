@@ -1,16 +1,42 @@
-from pydantic import Field
+from pydantic import Field, BaseModel, ConfigDict
 
 
-def owner_hash_field(**kwargs):
-    """Hash field for owner identifiers (must start with 'owner_')."""
-    prefix = "owner_"
-    return Field(
+class StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+
+from pydantic import Field, BaseModel
+
+
+class StrRootModel(BaseModel):
+    __root__: str
+
+    def __str__(self):
+        return self.__root__
+
+    @property
+    def value(self):
+        return self.__root__
+
+    def __eq__(self, other):
+        if isinstance(other, StrRootModel):
+            return self.__root__ == other.__root__
+        if isinstance(other, str):
+            return self.__root__ == other
+        return NotImplemented
+
+    def __hash__(self):
+        return hash(self.__root__)
+
+
+class OwnerHash(StrRootModel):
+    """Hash for owner identifiers (must start with 'owner_')."""
+    __root__: str = Field(
         ...,
-        min_length=43 + len(prefix),
-        max_length=43 + len(prefix),
-        pattern=rf'^{prefix}[A-Za-z0-9_-]{{43}}$',
+        min_length=49,
+        max_length=49,
+        pattern=r'^owner_[A-Za-z0-9_-]{43}$',
         description="owner_hash: 'owner_' + url-safe base64 (43 chars, e.g. SHA256-url-encoded hash)",
-        **kwargs,
     )
 
 

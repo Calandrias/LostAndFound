@@ -1,0 +1,187 @@
+# This file is auto-generated from Pydantic models. Do not edit by hand!
+
+APIResponseModel:
+  additionalProperties: false
+  properties:
+    success:
+      description: True on successful request (HTTP 2xx)
+      title: Success
+      type: boolean
+    error:
+      anyOf:
+      - $ref: '#/$defs/ErrorModel'
+      - type: 'null'
+      default: null
+      description: Error object if success == False
+    data:
+      title: Data
+    allowedActions:
+      additionalProperties:
+        $ref: '#/$defs/ActionDetailModel'
+      description: Contains only allowed actions as keys. May be empty if no actions
+        allowed.
+      title: Allowedactions
+      type: object
+    meta:
+      anyOf:
+      - $ref: '#/$defs/MetaModel'
+      - type: 'null'
+      default: null
+  required:
+  - success
+  - data
+  title: APIResponseModel
+  type: object
+LoginChallengeRequest:
+  additionalProperties: false
+  properties:
+    mode:
+      const: challenge
+      description: Get a challenge
+      title: Mode
+      type: string
+    owner_hash:
+      description: 'owner_hash: ''owner_'' + url-safe base64 (43 chars, e.g. SHA256-url-encoded
+        hash)'
+      maxLength: 49
+      minLength: 49
+      pattern: ^owner_[A-Za-z0-9_-]{43}$
+      title: Owner Hash
+      type: string
+    password_hash:
+      description: bcrypt hash string, 60 chars
+      maxLength: 60
+      minLength: 60
+      pattern: ^\$2[aby]\$[0-9]{2}\$[A-Za-z0-9./]{53}$
+      title: Password Hash
+      type: string
+  required:
+  - mode
+  - owner_hash
+  - password_hash
+  title: LoginChallengeRequest
+  type: object
+LoginResponseRequest:
+  additionalProperties: false
+  properties:
+    mode:
+      const: response
+      description: Respond to challenge
+      title: Mode
+      type: string
+    challenge_response:
+      title: Challenge Response
+      type: string
+  required:
+  - mode
+  - challenge_response
+  title: LoginResponseRequest
+  type: object
+LoginResponseDataModel:
+  additionalProperties: false
+  properties:
+    challenge:
+      anyOf:
+      - type: string
+      - type: 'null'
+      default: null
+      description: Challenge string the client must sign, only present if mode='challenge'
+      title: Challenge
+    expires_at:
+      description: Unix timestamp (seconds since epoch)
+      maximum: 4102444800
+      minimum: 0
+      title: Expires At
+      type: integer
+    session_token:
+      anyOf:
+      - type: string
+      - type: 'null'
+      default: null
+      description: Session token to be used for all future authenticated requests,
+        only set if mode='response'
+      title: Session Token
+  required:
+  - expires_at
+  title: LoginResponseDataModel
+  type: object
+$defs:
+  ActionDetailModel:
+    additionalProperties: false
+    properties:
+      endpoint:
+        description: API endpoint starting with / and not allowing external links
+        pattern: ^/[^/h].*
+        title: Endpoint
+        type: string
+      method:
+        enum:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - PATCH
+        title: Method
+        type: string
+      rateLimit:
+        anyOf:
+        - type: integer
+        - type: 'null'
+        default: null
+        title: Ratelimit
+      rateWindow:
+        anyOf:
+        - type: string
+        - type: 'null'
+        default: null
+        title: Ratewindow
+      description:
+        description: 'Action description to be uses in UI '
+        maxLength: 4096
+        minLength: 0
+        pattern: ^[A-Za-z0-9+/= ]+\n?$
+        title: Description
+        type: string
+    required:
+    - endpoint
+    - method
+    - description
+    title: ActionDetailModel
+    type: object
+  ErrorModel:
+    additionalProperties: false
+    properties:
+      code:
+        title: Code
+        type: string
+      message:
+        title: Message
+        type: string
+    required:
+    - code
+    - message
+    title: ErrorModel
+    type: object
+  MetaModel:
+    additionalProperties: false
+    properties:
+      version:
+        anyOf:
+        - type: string
+        - type: 'null'
+        default: null
+        title: Version
+      ttlSeconds:
+        anyOf:
+        - type: integer
+        - type: 'null'
+        default: null
+        title: Ttlseconds
+      requestId:
+        anyOf:
+        - type: string
+        - type: 'null'
+        default: null
+        title: Requestid
+    title: MetaModel
+    type: object

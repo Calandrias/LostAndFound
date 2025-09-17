@@ -1,4 +1,6 @@
 -r infra/requirements.txt
+prance
+openapi-spec-validator
 pytest
 pytest-cov
 coverage

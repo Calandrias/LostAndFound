@@ -5,11 +5,11 @@ import pytest
 import boto3
 from moto import mock_aws
 
-from runtime.shared.session_store import (
+from runtime.shared.db.session.session_store import (
     OwnerSessionHelper,
     VisitorSessionHelper,
 )
-from runtime.shared.session_model import OwnerSession, VisitorSession
+from runtime.shared.db.session.session_model import OwnerSession, VisitorSession
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb.service_resource import DynamoDBServiceResource

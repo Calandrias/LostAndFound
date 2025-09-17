@@ -7,10 +7,10 @@ import boto3
 from pydantic import ValidationError, BaseModel
 from botocore.exceptions import ClientError
 
-from runtime.shared.session_model import OwnerSession, VisitorSession
-from runtime.shared.shared_helper import dynamodb_decimal_to_int, current_unix_timestamp_utc
+from shared.db.session.session_model import OwnerSession, VisitorSession
+from shared.com.shared_helper import dynamodb_decimal_to_int, current_unix_timestamp_utc
 
-from runtime.shared.logging_utils import ProjectLogger
+from shared.com.logging_utils import ProjectLogger
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb.service_resource import Table, DynamoDBServiceResource

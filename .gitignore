@@ -209,3 +209,5 @@ __marimo__/
 # Local AWS CDK files
 .cdk.staging/
 cdk.out/
+.env
+2

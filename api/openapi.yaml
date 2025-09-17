@@ -1,0 +1,194 @@
+openapi: v3.0.x
+info:
+  title: Lost & Found QR Platform API
+  version: 0.1
+servers:
+  - url: https://api.lostfound.example
+paths:
+  /tag/{hash}:
+    get:
+      summary: "Lookup a tag by hash (Tag Scan Entry Point)"
+      operationId: tagRedirect
+      description: >
+        Returns metadata and status for a scanned tag. No authentication required.
+        Handles 'unclaimed' (no owner yet) and 'claimed' (owned) states.
+        Does not expose owner contact or sensitive info.
+      parameters:
+        - name: hash
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "302":
+          description: "Redirect to Tag UI"
+          headers:
+            Location:
+              description: "Destination URL of the UI, including Tag-Hash"
+              schema:
+                type: string
+                example: "/ui/?tag={hash}"
+        "404":
+          description: Tag not found (invalid or deleted)
+
+/owner/onboarding:
+  post:
+    summary: Owner Registration / Onboarding
+    operationId: ownerOnboarding
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/OnboardingRequest" # <--- bitte Pfade anpassen
+    responses:
+      "201":
+        description: Owner created
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardingResponse"
+
+/owner/login:
+  post:
+    summary: Owner Auth (Challenge/Response)
+    operationId: ownerLogin
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/LoginRequest"
+    responses:
+      "200":
+        description: Auth Step (challenge issued or session granted)
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginResponse"
+
+/owner/session/refresh:
+  post:
+    summary: Refresh a session token
+    operationId: ownerSessionRefresh
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SessionRefreshRequest"
+    responses:
+      "200":
+        description: Refreshed session token
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionRefreshResponse"
+
+/owner/storage:
+  get:
+    summary: Get encrypted private storage
+    operationId: getOwnerStorage
+    responses:
+      "200":
+        description: Encrypted storage returned
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EncryptedStorageResponse"
+  patch:
+    summary: Update encrypted private storage
+    operationId: updateOwnerStorage
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/EncryptedStorageRequest"
+    responses:
+      "200":
+        description: Storage updated
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EncryptedStorageResponse"
+
+/owner/logout:
+  post:
+    summary: Invalidate session token (logout)
+    operationId: ownerLogout
+    responses:
+      "204":
+        description: Logged out
+
+/owner/delete:
+  post:
+    summary: Owner account delete (self-service)
+    operationId: ownerDelete
+    responses:
+      "204":
+        description: Account deleted
+
+/owner/rotate_keys:
+  post:
+    summary: Rotate (replace) public key and entropy
+    operationId: rotateKeys
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RotateKeysRequest"
+    responses:
+      "200":
+        description: Keys rotated
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RotateKeysResponse"
+
+/owner/me:
+  get:
+    summary: Get reduced owner profile (no PII)
+    operationId: getOwnerMe
+    responses:
+      "200":
+        description: Reduced owner-ready profile
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnerMeResponse"
+components:
+  schemas:
+    TagScanResponse:
+      type: object
+      properties:
+        tagId:
+          type: string
+          description: "The unique ID of the tag (reference, not directly linkable to user data)"
+        status:
+          type: string
+          enum: [unclaimed, claimed]
+          description: "'unclaimed' (no owner) or 'claimed' (owner exists)"
+        currentState:
+          type: string
+          enum: [not_lost, lost]
+          nullable: true
+          description: "Tag's current status; present only if 'claimed'."
+        description:
+          type: string
+          nullable: true
+          description: "Optional, privacy-friendly tag description (if set by owner)."
+        claimable:
+          type: boolean
+          description: "Whether the tag can be claimed after login. True when status is 'unclaimed'."
+        allowedActions:
+          type: array
+          items:
+            type: string
+            enum: [claim, contact, report]
+          description: "UI hints: what actions are currently available for the user."
+        infoText:
+          type: string
+          description: "User-facing explanation for current tag state, not containing any PI."
+      required:
+        - tagId
+        - status
+        - claimable
+        - allowedActions
+        - infoText

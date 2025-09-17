@@ -1,12 +1,11 @@
 """Tests for logging utilities with identifier prefix masking, strict loglevel policy and memory handler for output capturing."""
 
-import os
 import logging
 import pytest
 import random
 import io
 
-from runtime.shared.logging_utils import ProjectLogger, SanitizingFormatter
+from runtime.shared.com.logging_utils import ProjectLogger, SanitizingFormatter
 
 
 def random_logger() -> str:

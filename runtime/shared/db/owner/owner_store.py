@@ -7,9 +7,9 @@ import boto3
 from pydantic import ValidationError, create_model
 from botocore.exceptions import ClientError
 
-from shared.owner_model import Owner, Status
-from runtime.shared.logging_utils import ProjectLogger
-from runtime.shared.shared_helper import current_unix_timestamp_utc, dynamodb_decimal_to_int
+from shared.db.owner.owner_model import Owner, Status
+from shared.com.logging_utils import ProjectLogger
+from shared.com.shared_helper import current_unix_timestamp_utc, dynamodb_decimal_to_int
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb.service_resource import Table, DynamoDBServiceResource
@@ -77,8 +77,11 @@ class OwnerHelper:
             # validate_fields expects a dict and raises ValidationError if something is wrong
             Owner.model_validate({field_name: value})
             return True
-        except ValidationError:
+        except (ValidationError, ValueError, TypeError):
             logger.error(f"Owner field validation error: {field_name}")  # log the field name only, not the value
+            return False
+        except Exception as e:  #pylint: disable=broad-except
+            logger.error(f"unexpected error during field validation: {e}")
             return False
 
 
