@@ -1,3 +1,4 @@
 [bandit]
-skips: B101 # assert_used, okay for test files
-         
+
+[assert_used]
+skips = */test_*.py,*/*_test.py
