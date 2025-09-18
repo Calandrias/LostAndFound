@@ -5,9 +5,6 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", from_attributes=True)
 
 
-from pydantic import Field, BaseModel
-
-
 class StrRootModel(BaseModel):
     __root__: str
 
@@ -29,6 +26,13 @@ class StrRootModel(BaseModel):
         return hash(self.__root__)
 
 
+class IntRootModel(BaseModel):
+    __root__: int
+
+    def __int__(self):
+        return self.__root__
+
+
 class OwnerHash(StrRootModel):
     """Hash for owner identifiers (must start with 'owner_')."""
     __root__: str = Field(
@@ -37,6 +41,17 @@ class OwnerHash(StrRootModel):
         max_length=49,
         pattern=r'^owner_[A-Za-z0-9_-]{43}$',
         description="owner_hash: 'owner_' + url-safe base64 (43 chars, e.g. SHA256-url-encoded hash)",
+    )
+
+
+class TagCode(StrRootModel):
+    """Field for public QR tag codes (must start with 'tag_')."""
+    __root__: str = Field(
+        ...,
+        min_length=32,
+        max_length=64,
+        pattern=r'tag_[A-Z0-9_-]{32,64}$',
+        description="tag_code: 'tag_' + public code with 32 to 64 alphanumeric chars)",
     )
 
 
@@ -55,19 +70,13 @@ def tag_code_field(**kwargs):
     )
 
 
-def session_token_field(**kwargs):
+class SessionToken(StrRootModel):
     """Field for session tokens (must start with 'sessiontok_')."""
-    prefix = "sessiontok_"
-    min_len = 43
-    max_len = 86
-    prefix_len = len(prefix)
-    return Field(
-        ...,
-        min_length=min_len,
-        max_length=max_len,
-        pattern=rf'^{prefix}[A-Za-z0-9\-_]{{{min_len - prefix_len},{max_len - prefix_len}}}$',
-        description=f"session_token: '{prefix}' + url-safe base64 random value ({min_len - prefix_len}-{max_len - prefix_len} chars)",
-        **kwargs,
+    __root__: str = Field(
+        min_length=43,
+        max_length=86,
+        pattern=rf'^sessiontok_[A-Za-z0-9\-_]{43,86}$',
+        description="session_token: 'sessiontok_' + url-safe base64 random value with 43 to 86 chars)",
     )
 
 
