@@ -1,7 +1,7 @@
-openapi: v3.0.x
+openapi: 3.1.0
 info:
   title: Lost & Found QR Platform API
-  version: 0.1
+  version: "0.1"
 servers:
   - url: https://api.lostfound.example
 paths:
@@ -39,7 +39,7 @@ paths:
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/OnboardingRequest" # <--- bitte Pfade anpassen
+            $ref:
     responses:
       "201":
         description: Owner created
@@ -56,7 +56,7 @@ paths:
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/LoginRequest"
+            $ref: "./schemas/schemas.yaml#components/schemas/LoginRequest"
     responses:
       "200":
         description: Auth Step (challenge issued or session granted)

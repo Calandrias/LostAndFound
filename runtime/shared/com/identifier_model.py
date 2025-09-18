@@ -1,91 +1,72 @@
-from pydantic import Field, BaseModel, ConfigDict
+from pydantic import Field, BaseModel, ConfigDict, StrictStr, StrictInt
+from typing import ClassVar
 
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", from_attributes=True)
 
 
-class StrRootModel(BaseModel):
-    __root__: str
-
-    def __str__(self):
-        return self.__root__
-
-    @property
-    def value(self):
-        return self.__root__
-
-    def __eq__(self, other):
-        if isinstance(other, StrRootModel):
-            return self.__root__ == other.__root__
-        if isinstance(other, str):
-            return self.__root__ == other
-        return NotImplemented
-
-    def __hash__(self):
-        return hash(self.__root__)
-
-
-class IntRootModel(BaseModel):
-    __root__: int
-
-    def __int__(self):
-        return self.__root__
-
-
-class OwnerHash(StrRootModel):
+class OwnerHash(BaseModel):
     """Hash for owner identifiers (must start with 'owner_')."""
-    __root__: str = Field(
+    prefix: ClassVar[str] = "owner_"
+    code_length: ClassVar[int] = 43
+    pattern: ClassVar[str] = fr'^{prefix}[A-Za-z0-9_-]{{{code_length}}}$'
+    value: str = Field(
         ...,
-        min_length=49,
-        max_length=49,
-        pattern=r'^owner_[A-Za-z0-9_-]{43}$',
-        description="owner_hash: 'owner_' + url-safe base64 (43 chars, e.g. SHA256-url-encoded hash)",
+        min_length=len(prefix) + code_length,
+        max_length=len(prefix) + code_length,
+        pattern=pattern,
+        description=f"owner_hash: '{prefix}' + url-safe base64 ({code_length} chars, e.g. SHA256-url-encoded hash)",
     )
 
 
-class TagCode(StrRootModel):
+class TagCode(BaseModel):
     """Field for public QR tag codes (must start with 'tag_')."""
-    __root__: str = Field(
+    prefix: ClassVar[str] = "tag_"
+    min_code: ClassVar[int] = 32
+    max_code: ClassVar[int] = 64
+    pattern: ClassVar[str] = fr'^{prefix}[A-Z0-9_-]{{{min_code},{max_code}}}$'
+    value: str = Field(
         ...,
-        min_length=32,
-        max_length=64,
-        pattern=r'tag_[A-Z0-9_-]{32,64}$',
-        description="tag_code: 'tag_' + public code with 32 to 64 alphanumeric chars)",
+        min_length=len(prefix) + min_code,
+        max_length=len(prefix) + max_code,
+        pattern=pattern,
+        description=f"tag_code: '{prefix}' + public code with {min_code} to {max_code} alphanumeric chars",
     )
 
-
-def tag_code_field(**kwargs):
-    """Field for public QR tag codes (must start with 'tag_')."""
-    prefix = "tag_"
-    min_code = 8
-    max_code = 64
-    return Field(
-        ...,
-        min_length=min_code,
-        max_length=max_code,
-        pattern=rf'^{prefix}[A-Za-z0-9_-]{{{min_code - len(prefix)},{max_code - len(prefix)}}}$',
-        description=f"tag_code: '{prefix}' + public code ({min_code - len(prefix)}-{max_code - len(prefix)} alphanumeric chars)",
-        **kwargs,
-    )
-
-
-class SessionToken(StrRootModel):
+class SessionToken(BaseModel):
     """Field for session tokens (must start with 'sessiontok_')."""
-    __root__: str = Field(
-        min_length=43,
-        max_length=86,
-        pattern=rf'^sessiontok_[A-Za-z0-9\-_]{43,86}$',
-        description="session_token: 'sessiontok_' + url-safe base64 random value with 43 to 86 chars)",
+    prefix: ClassVar[str] = "sessiontok_"
+    min_length: ClassVar[int] = 43
+    max_length: ClassVar[int] = 86
+    pattern: ClassVar[str] = fr'^{prefix}[A-Za-z0-9\-_]{{{min_length},{max_length}}}$'
+    value: str = Field(
+        ...,
+        min_length=len(prefix) + min_length,
+        max_length=len(prefix) + max_length,
+        pattern=pattern,
+        description=f"session_token: '{prefix}' + url-safe base64 random value with {min_length} to {max_length} chars",
     )
 
-
-def timestamp_field(**kwargs):
-    description = kwargs.pop("description", "Unix timestamp (seconds since epoch)")
-    return Field(
+class Timestamp(BaseModel):
+    """Unix timestamp (seconds since epoch)."""
+    value: StrictInt = Field(
         ...,
         ge=0,
         le=4102444800,  # Year 2100
+        description="Unix timestamp (seconds since epoch)",
+    )
+
+class PublicKey(BaseModel):
+    pattern: ClassVar[str] = r'^-----BEGIN PUBLIC KEY-----(.|\n)+-----END PUBLIC KEY-----\n?$'
+    min_length: ClassVar[int] = 272
+    max_length: ClassVar[int] = 800
+    description: ClassVar[str] = "PEM encoded public key"
+
+    value: StrictStr = Field(
+        ...,
+        min_length=min_length,
+        max_length=max_length,
+        pattern=pattern,
         description=description,
-        **kwargs,
     )

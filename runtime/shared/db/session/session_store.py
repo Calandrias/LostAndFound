@@ -9,6 +9,7 @@ from botocore.exceptions import ClientError
 
 from shared.db.session.session_model import OwnerSession, VisitorSession
 from shared.com.shared_helper import dynamodb_decimal_to_int, current_unix_timestamp_utc
+from shared.com.identifier_model import SessionToken, OwnerHash, TagCode, Timestamp
 
 from shared.com.logging_utils import ProjectLogger
 
@@ -70,8 +71,11 @@ class SessionHelperBase:
             response = self.table.get_item(Key={"session_token": session_token})
             item = response.get("Item")
             if item:
-                item = dynamodb_decimal_to_int(item)  # Convert DynamoDB Decimals to int
-
+                item = dynamodb_decimal_to_int(item)
+                for field, field_info in model.model_fields.items():
+                    field_type = field_info.annotation
+                    if field in item and hasattr(field_type, 'model_fields') and hasattr(field_type, 'validate'):
+                        item[field] = field_type(value=item[field])
             return model.model_validate(item) if item else None
         except (ClientError, ValidationError) as e:
             raise SessionRetrieveError("Failed to load session.") from e
@@ -102,18 +106,24 @@ class OwnerSessionHelper(SessionHelperBase):
         """ Create a new owner session with a unique token and expiration."""
 
         session_token = self.create_session_token()
-        logger.debug(f"Generated session token: {session_token}, length: {len(session_token)}")
+        logger.debug(f"Generated session token: {session_token}, length: {len(session_token)})")
         current_time = current_unix_timestamp_utc()
         expires_at = current_time + duration_seconds
         session = OwnerSession(
-            session_token=session_token,
-            owner_hash=owner_hash,
-            created_at=current_time,
-            expires_at=expires_at,
+            session_token=SessionToken(value=session_token),
+            owner_hash=OwnerHash(value=owner_hash),
+            created_at=Timestamp(value=current_time),
+            expires_at=Timestamp(value=expires_at),
             onetime=onetime,
+            invalidated_at=None,
         )
         try:
-            self.table.put_item(Item=session.model_dump())
+            item = session.model_dump()
+            item["session_token"] = session.session_token.value
+            item["owner_hash"] = session.owner_hash.value
+            item["created_at"] = session.created_at.value
+            item["expires_at"] = session.expires_at.value
+            self.table.put_item(Item=item)
             return session
         except (ClientError, ValidationError) as e:
             raise SessionCreateError("Failed to create owner session.") from e
@@ -144,13 +154,18 @@ class VisitorSessionHelper(SessionHelperBase):
         current_time = current_unix_timestamp_utc()
         expires_at = current_time + duration_seconds
         session = VisitorSession(
-            session_token=session_token,
-            tag_code=tag_code,
-            created_at=current_time,
-            expires_at=expires_at,
+            session_token=SessionToken(value=session_token),
+            tag_code=TagCode(value=tag_code),
+            created_at=Timestamp(value=current_time),
+            expires_at=Timestamp(value=expires_at),
         )
         try:
-            self.table.put_item(Item=session.model_dump())
+            item = session.model_dump()
+            item["session_token"] = session.session_token.value
+            item["tag_code"] = session.tag_code.value
+            item["created_at"] = session.created_at.value
+            item["expires_at"] = session.expires_at.value
+            self.table.put_item(Item=item)
             return session
         except (ClientError, ValidationError) as e:
             raise SessionCreateError("Failed to create visitor session.") from e

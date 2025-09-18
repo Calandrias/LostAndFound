@@ -1,34 +1,39 @@
 """Pydantic model for Owner data with validation."""
 from typing import ClassVar, Set
 from enum import Enum
-from pydantic import Field, StrictStr, StrictInt
+from pydantic import Field, StrictStr
 
-from shared.com.identifier_model import StrictModel, owner_hash_field, timestamp_field
+from shared.com.identifier_model import StrictModel, OwnerHash, Timestamp, PublicKey
 
 
-class Status(str, Enum):
-    """Enumeration for owner status."""
+class State(str, Enum):
+    """Enumeration for owner state."""
     ACTIVE = 'active'
     BLOCKED = 'blocked'
     ONBOARDING = 'onboarding'
     IN_DELETION = 'in_deletion'
 
 
-def password_hash_field(**kwargs) -> StrictStr:
-    temp: StrictStr = Field(
-        pattern=r'^\$2[aby]\$[0-9]{2}\$[A-Za-z0-9./]{53}$',
-        min_length=60,
-        max_length=60,
-        description="bcrypt hash string, 60 chars",
-        **kwargs,
-    )
-    return temp
+class PasswordHash(StrictModel):
+    pattern: ClassVar[str] = r'^\$2[aby]\$[0-9]{2}\$[A-Za-z0-9./]{53}$'
+    min_length: ClassVar[int] = 60
+    max_length: ClassVar[int] = 60
+    description: ClassVar[str] = "bcrypt hash string, 60 chars"
 
+    value: StrictStr = Field(
+        ...,
+        pattern=pattern,
+        min_length=min_length,
+        max_length=max_length,
+        description=description,
+    )
 
 class Owner(StrictModel):
     """Pydantic model representing an Owner with validation."""
-    owner_hash: StrictStr = owner_hash_field()
-    password_hash: StrictStr = password_hash_field()
+    owner_hash: OwnerHash
+    password_hash: PasswordHash
+    public_key: PublicKey
+    created_at: Timestamp
 
     salt: StrictStr = Field(
         pattern=r'^[A-Za-z0-9./]{22}$',
@@ -37,12 +42,6 @@ class Owner(StrictModel):
         description="bcrypt salt string",
     )
 
-    public_key: StrictStr = Field(
-        min_length=272,
-        max_length=800,
-        pattern=r'^-----BEGIN PUBLIC KEY-----(.|\n)+-----END PUBLIC KEY-----\n?$',
-        description="PEM encoded public key",
-    )
     random_entropy: StrictStr = Field(
         min_length=32,
         max_length=64,
@@ -56,7 +55,7 @@ class Owner(StrictModel):
         pattern=r'^[A-Za-z0-9+/=]+\n?$',
         description="Base64-encoded encrypted storage for owner's private data",
     )
-    created_at: StrictInt = timestamp_field()
-    status: Status = Field(default=Status.ONBOARDING, description="Owner account status flag: active, blocked, ongoing onboarding or pending deletion")
+    
+    state: State = Field(default=State.ONBOARDING, description="Owner account state flag: active, blocked, ongoing onboarding or pending deletion")
 
-    ALLOWED_UPDATE_FIELDS: ClassVar[Set[str]] = {"status", "random_entropy", "public_key", "password_hash"}
+    ALLOWED_UPDATE_FIELDS: ClassVar[Set[str]] = {"state", "random_entropy", "public_key", "password_hash"}

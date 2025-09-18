@@ -4,10 +4,11 @@ import os
 from typing import Optional, Any, Dict, TYPE_CHECKING
 
 import boto3
-from pydantic import ValidationError, create_model
+from pydantic import ValidationError, create_model, Field
 from botocore.exceptions import ClientError
 
-from shared.db.owner.owner_model import Owner, Status
+from shared.db.owner.owner_model import Owner, State, PasswordHash, PublicKey, Timestamp,OwnerHash
+
 from shared.com.logging_utils import ProjectLogger
 from shared.com.shared_helper import current_unix_timestamp_utc, dynamodb_decimal_to_int
 
@@ -34,30 +35,32 @@ class OwnerHelper:
         random_entropy: str,
         created_at: Optional[int] = None,
         owner_encrypted_storage: Optional[str] = "",
-        status: Status = Status.ONBOARDING,
+        state: State = State.ONBOARDING,
     ) -> Owner:
         """Creates a validated Owner object from fields, raises ValidationError if invalid."""
-        _status = Status(status) if isinstance(status, str) else status
-        return Owner(owner_hash=owner_hash,
-                     salt=salt,
-                     password_hash=password_hash,
-                     public_key=public_key,
-                     random_entropy=random_entropy,
-                     owner_encrypted_storage=owner_encrypted_storage or "",
-                     created_at=created_at or current_unix_timestamp_utc(),
-                     status=_status)
+        _state = State(state) if isinstance(state, str) else state
+        return Owner(
+            owner_hash=OwnerHash(value=owner_hash),
+            salt=salt,
+            password_hash=PasswordHash(value=password_hash),
+            public_key=PublicKey(value=public_key),
+            random_entropy=random_entropy,
+            owner_encrypted_storage=owner_encrypted_storage or "",
+            created_at=Timestamp(value=created_at or current_unix_timestamp_utc()),
+            state=_state
+        )
 
     @staticmethod
     def is_active(owner: Owner) -> bool:
-        return owner.status == Status.ACTIVE
+        return owner.state == State.ACTIVE
 
     @staticmethod
     def is_blocked(owner: Owner) -> bool:
-        return owner.status == Status.BLOCKED
+        return owner.state == State.BLOCKED
 
     @staticmethod
     def is_in_deletion(owner: Owner) -> bool:
-        return owner.status == Status.IN_DELETION
+        return owner.state == State.IN_DELETION
 
     @staticmethod
     def validate_owner(owner: Owner) -> bool:
@@ -72,16 +75,22 @@ class OwnerHelper:
     # Single-field validation via Pydantic V2
     @staticmethod
     def validate_field(field_name: str, value) -> bool:
-        """Uses Pydantic V2 to validate a single field of Owner."""
+        """Uses Pydantic V2 to validate a single field of Owner, including constraints."""
         try:
-            # validate_fields expects a dict and raises ValidationError if something is wrong
-            Owner.model_validate({field_name: value})
+            field_info = Owner.model_fields[field_name]
+            field_type = field_info.annotation
+            field_constraints = field_info.metadata
+            # Build Field with constraints if present
+            field_args = {}
+            for k in ["min_length", "max_length", "pattern"]:
+                if k in field_constraints:
+                    field_args[k] = field_constraints[k]
+            temp_field = Field(**field_args) if field_args else ...
+            temp_model = create_model("TempModel", **{field_name: (field_type, temp_field)})
+            temp_model.model_validate({field_name: value})
             return True
-        except (ValidationError, ValueError, TypeError):
-            logger.error(f"Owner field validation error: {field_name}")  # log the field name only, not the value
-            return False
-        except Exception as e:  #pylint: disable=broad-except
-            logger.error(f"unexpected error during field validation: {e}")
+        except ValidationError:
+            logger.error(f"Owner field validation error: {field_name}")
             return False
 
 
@@ -110,83 +119,87 @@ class OwnerStore:
     def get_owner(self, owner_hash: str) -> Optional[Owner]:
         """Read all fields of an owner; returns validated Owner or None if not found."""
         try:
-            response = self.table.get_item(Key={"owner_hash": owner_hash})
+            response = self.table.get_item(Key={"owner_hash": owner_hash if isinstance(owner_hash, str) else owner_hash.value})
             item = response.get("Item")
             if item:
-                item = dynamodb_decimal_to_int(item)  # Convert DynamoDB Decimals to int
+                item = dynamodb_decimal_to_int(item)
+                # Wrap identifier fields for model validation
+                if "owner_hash" in item:
+                    item["owner_hash"] = OwnerHash(value=item["owner_hash"])
+                if "password_hash" in item:
+                    item["password_hash"] = PasswordHash(value=item["password_hash"])
+                if "public_key" in item:
+                    item["public_key"] = PublicKey(value=item["public_key"])
+                if "created_at" in item:
+                    item["created_at"] = Timestamp(value=item["created_at"])
             return Owner.model_validate(item) if item else None
         except ClientError:
             return None
         except ValidationError as e:
             logger.error(f"get_owner validation error: {e}")
             return None
-        except Exception as e:  #pylint: disable=broad-except
+        except Exception as e:
             logger.error(f"get_owner unknown error: {e}")
             return None
 
     def get_owner_field(self, owner_hash: str, field: str) -> Optional[Any]:
         """Read a single field of an owner document."""
         try:
-            response = self.table.get_item(Key={"owner_hash": owner_hash}, ProjectionExpression=field)
+            expr_names = {f"#{field}": field}
+            response = self.table.get_item(Key={"owner_hash": owner_hash}, ProjectionExpression=f"#{field}", ExpressionAttributeNames=expr_names)
             item = response.get("Item")
-            valid_item = Owner.model_validate(item) if item else None
-            return valid_item.model_dump().get(field, None) if valid_item else None
+            if item and field in item:
+                return item[field]
+            return None
         except ClientError as e:
             logger.error(f"get_owner_field client error: {e}")
-            return None
-        except ValidationError as e:
-            logger.error(f"get_owner_field validation error: {e}")
             return None
         except Exception as e:  #pylint: disable=broad-except
             logger.error(f"get_owner_field unknown error: {e}")
             return None
 
-    def put_owner(self, owner: Owner):
+    def put_owner(self, owner: Owner) -> None:
         """Create or overwrite the entire owner record."""
-
         try:
-            valid_owner = Owner.model_validate(owner.model_dump(mode="json"), from_attributes=True)
-            item = valid_owner.model_dump(mode="json", exclude_unset=True)
+            item = owner.model_dump()
+            # DynamoDB expects string for key fields, not dicts
+            item["owner_hash"] = owner.owner_hash.value
+            item["password_hash"] = owner.password_hash.value
+            item["public_key"] = owner.public_key.value
+            item["created_at"] = owner.created_at.value
+            item["salt"] = owner.salt
+            item["random_entropy"] = owner.random_entropy
+            item["owner_encrypted_storage"] = owner.owner_encrypted_storage
+            item["state"] = owner.state.value if hasattr(owner.state, "value") else owner.state
             self.table.put_item(Item=item)
-        except ValidationError as ve:
-            logger.error(f"put_owner validation error: {ve}")
-            raise
-        except ClientError as e:
+        except Exception as e:
             logger.error(f"put_owner error: {e}")
             raise
 
     def update_owner_field(self, owner_hash: str, field: str, value: Any):
         """Update a single field for an existing owner."""
         if field not in Owner.ALLOWED_UPDATE_FIELDS:
-            raise ValidationError(f"field >{field}< not part of Owner")
-
-        field_info = Owner.model_fields[field]  # pylint: disable=E1136 # Owner.model_fields is dict and subscripting is safe
-        field_type = field_info.annotation
-
-        temp_model = create_model("TempModel", **{field: (field_type, ...)})
-        try:
-            temp_model.model_validate({field: value})
-        except ValidationError as e:
-            raise ValidationError(f"invalid value for field {field}") from e
-
-        try:
-            expr_names = {f"#{field}": field}
-            resp = self.table.update_item(Key={"owner_hash": owner_hash},
-                                          UpdateExpression=f"SET #{field} = :v",
-                                          ExpressionAttributeValues={":v": value},
-                                          ExpressionAttributeNames=expr_names,
-                                          ReturnValues="UPDATED_NEW")
-            return resp.get("Attributes", {}).get(field)
-        except Exception as e:
-            logger.error(f"update_owner_field error: {e}")
-            raise
+            raise ValueError(f"field >{field}< not part of Owner")
+        key_value = owner_hash.value if hasattr(owner_hash, "value") else owner_hash
+        resp = self.table.update_item(
+            Key={"owner_hash": key_value},
+            UpdateExpression="SET #field = :val",
+            ExpressionAttributeNames={"#field": field},
+            ExpressionAttributeValues={":val": value},
+        )
+        return resp
 
     def update_owner_fields(self, owner_hash: str, updates: Dict[str, Any]):
         """Update multiple fields for an existing owner."""
-        expr = "SET " + ", ".join(f"{k}=:{k}" for k in updates)
+        expr_names = {f"#{k}": k for k in updates}
+        expr = "SET " + ", ".join(f"#{k}=:{k}" for k in updates)
         attrs = {f":{k}": v for k, v in updates.items()}
         try:
-            resp = self.table.update_item(Key={"owner_hash": owner_hash}, UpdateExpression=expr, ExpressionAttributeValues=attrs, ReturnValues="UPDATED_NEW")
+            resp = self.table.update_item(Key={"owner_hash": owner_hash},
+                                          UpdateExpression=expr,
+                                          ExpressionAttributeValues=attrs,
+                                          ExpressionAttributeNames=expr_names,
+                                          ReturnValues="UPDATED_NEW")
             return resp.get("Attributes")
         except Exception as e:
             logger.error(f"update_owner_fields error: {e}")
