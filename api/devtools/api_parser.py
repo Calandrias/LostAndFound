@@ -3,13 +3,13 @@ import sys
 import json
 import yaml
 from copy import deepcopy
-from typing import Any, Dict, List, DefaultDict
+from typing import Any, Dict, List, DefaultDict, Optional
 from collections import defaultdict
 from prance import BaseParser, ValidationError
-from helper import load_config, build_path
+from helper import Config, extract_schema_refs, validation_error_printer, dictify, update_refs, patch_const_to_enum
 
 
-def combine_openapi(openapi_path: str, schemas_path: str, out_path: str = "openapi_combined.yaml") -> Dict:
+def combine_openapi(openapi_path: str, schemas_path: str, out_path: str = "openapi_combined.yaml") -> Dict[str, Any]:
     """
     Combines OpenAPI YAML with external schemas into a self-contained file.
     Returns the combined spec for validation.
@@ -23,19 +23,7 @@ def combine_openapi(openapi_path: str, schemas_path: str, out_path: str = "opena
     combined = deepcopy(openapi)
     combined.setdefault('components', {})['schemas'] = schemas['components']['schemas']
 
-    def fix_refs(obj):
-        if isinstance(obj, dict):
-            for k, v in obj.items():
-                if k == '$ref' and isinstance(v, str) and '#' in v:
-                    after_hash = v.split('#', 1)[-1]
-                    obj[k] = '#' + after_hash
-                else:
-                    fix_refs(v)
-        elif isinstance(obj, list):
-            for v in obj:
-                fix_refs(v)
-
-    fix_refs(combined)
+    update_refs(combined)
 
     with open(out_path, 'w', encoding='utf-8') as f:
         yaml.dump(combined, f, sort_keys=False, default_flow_style=False, allow_unicode=True)
@@ -44,7 +32,7 @@ def combine_openapi(openapi_path: str, schemas_path: str, out_path: str = "opena
     return combined
 
 
-def validate_schema_references(combined_spec: Dict) -> Dict:
+def validate_schema_references(combined_spec: Dict[str, Any]) -> Dict[str, Any]:
     """
     Pre-Prance validation: Check if all $ref references can be resolved.
     Returns detailed validation report.
@@ -103,44 +91,12 @@ def validate_schema_references(combined_spec: Dict) -> Dict:
     return validation_report
 
 
-def validate_request_response_schemas(combined_spec: Dict) -> Dict:
+def validate_request_response_schemas(combined_spec: Dict[str, Any]) -> Dict[str, Any]:
     """
     Validate that requestBody and response schemas reference valid schemas.
     Focus on Lost & Found platform specific validation.
     """
     validation_report = {'valid': True, 'issues': [], 'request_body_count': 0, 'response_count': 0, 'discriminator_issues': []}
-
-    def extract_schema_refs(obj, context=""):
-        """Extract all schema references from request/response"""
-        refs = []
-        if isinstance(obj, dict):
-            if '$ref' in obj:
-                refs.append(obj['$ref'])
-            elif 'schema' in obj:
-                if isinstance(obj['schema'], dict) and '$ref' in obj['schema']:
-                    refs.append(obj['schema']['$ref'])
-                elif isinstance(obj['schema'], dict) and 'oneOf' in obj['schema']:
-                    # Check discriminated unions (important for Lost & Found)
-                    for one_of_item in obj['schema']['oneOf']:
-                        if isinstance(one_of_item, dict) and '$ref' in one_of_item:
-                            refs.append(one_of_item['$ref'])
-
-                    # Check discriminator mapping
-                    if 'discriminator' in obj['schema']:
-                        discriminator = obj['schema']['discriminator']
-                        if 'mapping' in discriminator:
-                            for disc_key, disc_ref in discriminator['mapping'].items():
-                                refs.append(disc_ref)
-                        else:
-                            validation_report['discriminator_issues'].append({'context': context, 'issue': 'Discriminator without mapping found'})
-
-            for key, value in obj.items():
-                refs.extend(extract_schema_refs(value, f"{context}.{key}"))
-        elif isinstance(obj, list):
-            for i, item in enumerate(obj):
-                refs.extend(extract_schema_refs(item, f"{context}[{i}]"))
-
-        return refs
 
     # Get available schemas
     available_schemas = set()
@@ -183,7 +139,7 @@ def validate_request_response_schemas(combined_spec: Dict) -> Dict:
     return validation_report
 
 
-def detailed_validation_report(combined_spec: Dict) -> bool:
+def detailed_validation_report(combined_spec: Dict[str, Any]) -> bool:
     """
     Comprehensive validation before sending to Prance.
     Returns True if validation passes, False otherwise.
@@ -235,27 +191,6 @@ def detailed_validation_report(combined_spec: Dict) -> bool:
     print(f"  • Overall: {'✅ READY FOR PRANCE' if overall_valid else '❌ NEEDS FIXING'}")
 
     return overall_valid
-
-
-def validation_error_printer(ve: ValidationError):
-    """Enhanced error printer for Prance ValidationError"""
-    message = None
-    if hasattr(ve, 'message') and ve.message:
-        message = ve.message
-    elif hasattr(ve, 'args') and ve.args:
-        message = str(ve.args[0])
-    else:
-        message = str(ve)
-
-    error_dict = {
-        "message": json.dumps(message, indent=2),
-        "validator": getattr(ve, 'validator', None),
-        "validator_value": getattr(ve, 'validator_value', None),
-        "absolute_path": list(getattr(ve, 'absolute_path', [])),
-        "instance": str(getattr(ve, 'instance', None))[:500] + "..." if len(str(getattr(ve, 'instance', None))) > 500 else str(getattr(ve, 'instance', None))
-    }
-
-    print(json.dumps(error_dict, indent=2, ensure_ascii=False))
 
 
 def load_openapi_by_tag(filename: str) -> DefaultDict[str, List[Dict[str, Any]]]:
@@ -311,11 +246,11 @@ def load_openapi_by_tag(filename: str) -> DefaultDict[str, List[Dict[str, Any]]]
 
 
 if __name__ == "__main__":
-    cfg = load_config("config.json5")
-    openapi_file = build_path(cfg["openapi_file"])
-    schemas_file = build_path(cfg["schema_file"])
-    temp_file = build_path(cfg["temp_api_file"])
-    output_dir = build_path(cfg["output_dir"])
+    cfg = Config.load("config.json5")
+    openapi_file = cfg.get_path("openapi_file")
+    schemas_file = cfg.get_path("schema_file")
+    temp_file = cfg.get_path("temp_api_file")
+    output_dir = cfg.get_path("output_dir")
 
     print("🚀 Enhanced OpenAPI Parser for Lost & Found Platform")
     print("=" * 60)
@@ -331,7 +266,7 @@ if __name__ == "__main__":
         print("\n⚠️  Pre-validation failed, but continuing with Prance...")
         print("Review the issues above before deploying.")
     else:
-        print("\n✅ Pre-validation passed - OpenAPI spec looks good!")
+        print("\n✅ Pre-validation passed – OpenAPI spec looks good!")
 
     # Step 3: Prance validation and parsing
     print("\n🔧 Running Prance validation and parsing...")

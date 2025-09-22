@@ -1,0 +1,10 @@
+# {{ tag_name }}_handler_impl.py
+from {{ tag_name }}_tag_abc import {{ tag_name|capitalize }}TagABC
+
+class {{ tag_name|capitalize }}Handler({{ tag_name|capitalize }}TagABC):
+    {% for endpoint in endpoints %}
+    def {{ endpoint.operation_id }}(self, event, context, cache):
+        """{{ endpoint.summary }} ({{ endpoint.method }} {{ endpoint.path }})"""
+        # TODO: Implement logic for {{ endpoint.operation_id }}
+        pass
+    {% endfor %}

@@ -3,24 +3,18 @@
     // optional, not decorated models
     //APIResponseModel: "shared.api.response_model:APIResponseModel",
   },
-  input_dir: {
-    //"LostAndFound/runtime/shared
-    type: "relative", //alt: "absolut"
-    path: "runtime/shared",
-    up: 2,
-  }, // ../
-  output_dir: {
-    //"LostAndFound/api/generated
-    type: "relative", //alt: "absolut"
-    path: "generated",
-    up: 1,
+  paths: {
+    input_dir: "runtime/shared",
+    output_dir: "api/generated",
+    schema_file: "api/schemas/schemas.yaml",
+    openapi_file: "api/openapi.yaml",
+    temp_api_file: "api/temp.yaml"
   },
-  schema_file: {
-    //"LostAndFound/api/schemas/schemas.yaml",
-    type: "relative", //alt: "absolut"
-    up: 1,
-    path: "schemas/schemas.yaml",
-  },
-  openapi_file: { type: "relative", up: 1, path: "openapi.yaml" },
-  temp_api_file: { type: "relative", up: 1, path: "temp.yaml" },
+  lambdas: [
+    {
+      tag: "owner",
+      runtime_dir: "runtime/owner",
+      template: "owner_tag_abc.jinja2"
+    }
+  ]
 }

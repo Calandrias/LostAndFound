@@ -1,0 +1,13 @@
+# {{ tag_name }}_tag_abc.py
+from abc import ABC, abstractmethod
+
+class {{ tag_name|capitalize }}TagABC(ABC):
+{% for endpoint in endpoints %}
+{% if endpoint.security %}
+@with_session
+{% endif %}
+@abstractmethod
+def {{ endpoint.operation_id }}(self, event, context):
+"""{{ endpoint.summary }} ({{ endpoint.method }} {{ endpoint.path }})"""
+pass
+{% endfor %}

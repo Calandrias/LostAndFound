@@ -3,20 +3,34 @@ Minimal Zero-Overhead Model Registry
 """
 _REGISTERED_MODELS = {}
 
+from typing import Union
 
-def api_model(cls=None, *, name=None, tags=None, req_res=None):
+
+def api_model(cls=None, *, name=None, tags=None, req_res=None, discriminator_field=None):
     """
-    minimal Decorator vor Model-registartion
+    Minimal decorator for model registration, with optional discriminator info.
     """
 
     def decorator(model_cls):
         model_name = name or model_cls.__name__
-
+        # Try to auto-detect union/discriminator
+        is_union_request = False
+        detected_discriminator = None
+        if hasattr(model_cls, 'model_fields'):
+            for _field_name, field in model_cls.model_fields.items():
+                ann = getattr(field, 'annotation', None)
+                # Check for Union type
+                if hasattr(ann, '__origin__') and ann is not None and ann.__origin__ is Union:
+                    is_union_request = True
+                    # Try to get discriminator from Field
+                    detected_discriminator = getattr(field, 'discriminator', None) or discriminator_field
         _REGISTERED_MODELS[model_name] = {
             'class': model_cls,
             'module': model_cls.__module__,
             'tags': tags or set(),
             'req_res': req_res,
+            'is_union_request': is_union_request,
+            'discriminator_field': detected_discriminator,
         }
         return model_cls
 
@@ -37,6 +51,15 @@ def get_models_by_req_res(req_res_type):
 
 def get_response_models():
     return get_models_by_req_res("response")
+
+
+def get_request_models():
+    return get_models_by_req_res("request")
+
+
+def get_union_requests():
+    """Return all registered models that are union requests with a discriminator."""
+    return {name: info.copy() for name, info in _REGISTERED_MODELS.items() if info.get('is_union_request') and info.get('discriminator_field')}
 
 
 # Convenience-Aliases (zero-overhead)

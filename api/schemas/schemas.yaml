@@ -4,6 +4,7 @@ components:
   schemas:
     APIResponseModel:
       additionalProperties: false
+      description: Standard API response wrapper for all endpoints.
       properties:
         allowedActions:
           additionalProperties:
@@ -13,6 +14,7 @@ components:
           title: Allowedactions
           type: object
         data:
+          description: Response data, discriminated by 'kind'.
           discriminator:
             mapping:
               no_data: '#/components/schemas/NoData'
@@ -25,14 +27,15 @@ components:
         error:
           $ref: '#/components/schemas/ErrorModel'
           default: null
-          description: Error object if success == False
+          description: Error object if success == False.
           nullable: true
         meta:
           $ref: '#/components/schemas/MetaModel'
           default: null
+          description: Optional metadata for the response.
           nullable: true
         success:
-          description: True on successful request (HTTP 2xx)
+          description: True on successful request (HTTP 2xx).
           title: Success
           type: boolean
       required:
@@ -42,20 +45,22 @@ components:
       type: object
     ActionDetailModel:
       additionalProperties: false
+      description: Details about allowed actions for the client after a response.
       properties:
         description:
-          description: 'Action description to be uses in UI '
+          description: Action description to be used in UI.
           maxLength: 4096
           minLength: 0
           pattern: ^[A-Za-z0-9+/= ]+\n?$
           title: Description
           type: string
         endpoint:
-          description: API endpoint starting with / and not allowing external links
+          description: API endpoint starting with / and not allowing external links.
           pattern: ^/[^/h].*
           title: Endpoint
           type: string
         method:
+          description: HTTP method for the action.
           enum:
           - GET
           - POST
@@ -66,11 +71,13 @@ components:
           type: string
         rateLimit:
           default: null
+          description: Number of allowed attempts, if rate limited.
           nullable: true
           title: Ratelimit
           type: integer
         rateWindow:
           default: null
+          description: Rate window, e.g. '60s'.
           nullable: true
           title: Ratewindow
           type: string
@@ -84,8 +91,9 @@ components:
       additionalProperties: false
       properties:
         kind:
-          const: delete_owner_challange
           default: delete_owner_challange
+          enum:
+          - delete_owner_challange
           title: Kind
           type: string
         owner_hash:
@@ -106,8 +114,9 @@ components:
           $ref: '#/components/schemas/Timestamp'
           description: Expiration time of the challenge
         kind:
-          const: delete_owner_challenge
           default: delete_owner_challenge
+          enum:
+          - delete_owner_challenge
           title: Kind
           type: string
       required:
@@ -123,8 +132,9 @@ components:
           title: Confirmation Text
           type: string
         kind:
-          const: delete_owner_confirm
           default: delete_owner_confirm
+          enum:
+          - delete_owner_confirm
           title: Kind
           type: string
       required:
@@ -139,8 +149,9 @@ components:
           title: Deleted
           type: boolean
         kind:
-          const: delete_owner_confirm
           default: delete_owner_confirm
+          enum:
+          - delete_owner_confirm
           title: Kind
           type: string
       required:
@@ -166,11 +177,14 @@ components:
       type: object
     ErrorModel:
       additionalProperties: false
+      description: Error details for failed API requests.
       properties:
         code:
+          description: Machine-readable error code, e.g., 'not_found', 'forbidden'.
           title: Code
           type: string
         message:
+          description: Human-readable error message.
           title: Message
           type: string
       required:
@@ -182,8 +196,9 @@ components:
       additionalProperties: false
       properties:
         kind:
-          const: login_challenge
           default: login_challenge
+          enum:
+          - login_challenge
           title: Kind
           type: string
         owner_hash:
@@ -206,8 +221,9 @@ components:
           $ref: '#/components/schemas/Timestamp'
           description: Expiration time of the challenge and session token
         kind:
-          const: login_challenge
           default: login_challenge
+          enum:
+          - login_challenge
           title: Kind
           type: string
       required:
@@ -239,8 +255,9 @@ components:
           title: Challenge Response
           type: string
         kind:
-          const: login_response
           default: login_response
+          enum:
+          - login_response
           title: Kind
           type: string
       required:
@@ -254,8 +271,9 @@ components:
           $ref: '#/components/schemas/Timestamp'
           description: Expiration time of the session token
         kind:
-          const: login_response
           default: login_response
+          enum:
+          - login_response
           title: Kind
           type: string
       required:
@@ -264,19 +282,42 @@ components:
       type: object
     MetaModel:
       additionalProperties: false
+      description: Metadata for API responses, e.g. version, TTL, requestId, and rate
+        limiting.
       properties:
+        rateLimit:
+          default: null
+          description: Maximum number of requests allowed in the current window.
+          nullable: true
+          title: Ratelimit
+          type: integer
+        rateLimitRemaining:
+          default: null
+          description: Number of requests remaining in the current window.
+          nullable: true
+          title: Ratelimitremaining
+          type: integer
+        rateLimitReset:
+          default: null
+          description: Time when the rate limit window resets (Unix timestamp).
+          nullable: true
+          title: Ratelimitreset
+          type: integer
         requestId:
           default: null
+          description: Optional trace/debug field for server logs.
           nullable: true
           title: Requestid
           type: string
         ttlSeconds:
           default: null
+          description: Data validity in seconds (TTL), if relevant.
           nullable: true
           title: Ttlseconds
           type: integer
         version:
           default: null
+          description: API or response schema version for migrations.
           nullable: true
           title: Version
           type: string
@@ -286,8 +327,9 @@ components:
       additionalProperties: false
       properties:
         kind:
-          const: no_data
           default: no_data
+          enum:
+          - no_data
           title: Kind
           type: string
       title: NoData
@@ -296,8 +338,9 @@ components:
       additionalProperties: false
       properties:
         kind:
-          const: onboarding_init
           default: onboarding_init
+          enum:
+          - onboarding_init
           title: Kind
           type: string
         owner_hash:
@@ -316,8 +359,9 @@ components:
           $ref: '#/components/schemas/Timestamp'
           description: Expiration time of the session token
         kind:
-          const: onboarding_init
           default: onboarding_init
+          enum:
+          - onboarding_init
           title: Kind
           type: string
         random_entropy:
@@ -333,8 +377,9 @@ components:
       additionalProperties: false
       properties:
         kind:
-          const: onboarding_public_key
           default: onboarding_public_key
+          enum:
+          - onboarding_public_key
           title: Kind
           type: string
         public_key:
@@ -351,8 +396,9 @@ components:
           $ref: '#/components/schemas/Timestamp'
           description: Timestamp when the owner account was created
         kind:
-          const: onboarding_public_key
           default: onboarding_public_key
+          enum:
+          - onboarding_public_key
           title: Kind
           type: string
       required:
@@ -423,8 +469,9 @@ components:
           - $ref: '#/components/schemas/NoData'
           title: Data
         kind:
-          const: owner_response
           default: owner_response
+          enum:
+          - owner_response
           title: Kind
           type: string
       required:
@@ -443,8 +490,9 @@ components:
           $ref: '#/components/schemas/Timestamp'
           description: Expiration time of the challenge
         kind:
-          const: storage_delete_challenge
           default: storage_delete_challenge
+          enum:
+          - storage_delete_challenge
           title: Kind
           type: string
       required:
@@ -456,8 +504,9 @@ components:
       additionalProperties: false
       properties:
         kind:
-          const: storage_delete_challenge
           default: storage_delete_challenge
+          enum:
+          - storage_delete_challenge
           title: Kind
           type: string
         owner_hash:
@@ -474,8 +523,9 @@ components:
           title: Confirmation Text
           type: string
         kind:
-          const: storage_delete_confirm
           default: storage_delete_confirm
+          enum:
+          - storage_delete_confirm
           title: Kind
           type: string
       required:
@@ -490,8 +540,9 @@ components:
           title: Deleted
           type: boolean
         kind:
-          const: storage_delete_confirm
           default: storage_delete_confirm
+          enum:
+          - storage_delete_confirm
           title: Kind
           type: string
       required:
@@ -524,8 +575,9 @@ components:
           title: Encrypted Storage
           type: string
         kind:
-          const: owner_storage
           default: owner_storage
+          enum:
+          - owner_storage
           title: Kind
           type: string
         updated_at:
@@ -579,8 +631,9 @@ components:
       additionalProperties: false
       properties:
         kind:
-          const: session_refresh
           default: session_refresh
+          enum:
+          - session_refresh
           title: Kind
           type: string
       title: SessionRefreshRequest
@@ -592,8 +645,9 @@ components:
           $ref: '#/components/schemas/Timestamp'
           description: New expiration time of the refreshed session token
         kind:
-          const: session_refresh
           default: session_refresh
+          enum:
+          - session_refresh
           title: Kind
           type: string
       required:

@@ -1,0 +1,29 @@
+# lambda_handler.py
+
+from {{ tag_name }}_handler_impl import {{ tag_name|capitalize }}Handler
+
+handler_instance = {{ tag_name|capitalize }}Handler()
+
+# Simple in-memory cache (lives as long as Lambda is warm)
+cache = {}
+
+routes = {
+{% for endpoint in endpoints %}
+('{{ endpoint.method }}', '{{ endpoint.path }}'): handler_instance.{{ endpoint.operation_id }},
+{% endfor %}
+}
+
+def lambda_handler(event, context):
+    method = event['httpMethod']
+    path = event['path']
+    key = (method, path)
+    if key in routes:
+        response = routes[key](event, context, cache)
+    if method == 'GET':
+        cache[key] = response
+        return response
+    else:
+        return {
+            "statusCode": 404,
+            "body": "Endpoint not found"
+            }

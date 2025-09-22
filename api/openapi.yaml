@@ -4,9 +4,16 @@ info:
   version: "0.1"
 servers:
   - url: https://api.lostfound.example
+
+tags:
+  - name: Owner
+    description: End-user (owner) account management and authentication
+
 paths:
   /owner/onboarding:
     post:
+      tags:
+        - Owner
       summary: Owner Registration / Onboarding
       operationId: ownerOnboarding
       requestBody:
@@ -16,9 +23,21 @@ paths:
           application/json:
             schema:
               $ref: "./schemas/schemas.yaml#/components/schemas/OnboardingRequest"
+      parameters:
+        - name: Onetime-Token
+          in: header
+          description: Onetime token received in previous onboarding step (required for onboarding_public_key)
+          required: false
+          schema:
+            type: string
       responses:
         "201":
           description: Owner created or onboarding step completed
+          headers:
+            Onetime-Token:
+              description: Onetime token for next onboarding step (sent after onboarding_init)
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -26,6 +45,8 @@ paths:
 
   /owner/login:
     post:
+      tags:
+        - Owner
       summary: Owner Auth (Challenge/Response)
       operationId: ownerLogin
       security:
@@ -38,9 +59,25 @@ paths:
           application/json:
             schema:
               $ref: "./schemas/schemas.yaml#/components/schemas/LoginRequest"
+      parameters:
+        - name: Onetime-Token
+          in: header
+          description: Onetime token received in previous login challenge (required for login_response)
+          required: false
+          schema:
+            type: string
       responses:
         "200":
           description: Auth Step (challenge issued or session granted)
+          headers:
+            Session-Token:
+              description: Session token issued after successful login (starts with 'sessiontok_')
+              schema:
+                type: string
+            Onetime-Token:
+              description: Onetime token for next login step (sent after login_challenge)
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -48,6 +85,8 @@ paths:
 
   /owner/refresh:
     post:
+      tags:
+        - Owner
       summary: Refresh a session token
       operationId: ownerSessionRefresh
       security:
@@ -70,6 +109,8 @@ paths:
 
   /owner/logout:
     post:
+      tags:
+        - Owner
       summary: Invalidate session token (logout)
       operationId: ownerLogout
       security:
@@ -78,18 +119,49 @@ paths:
         "204":
           description: Logged out
 
-  /owner/delete:
-    post:
-      summary: Owner account delete (self-service)
-      operationId: ownerDelete
+  /owner:
+    get:
+      tags:
+        - Owner
+      summary: Get owner account info/status
+      operationId: ownerGet
       security:
         - SessionTokenAuth: []
       responses:
+        "200":
+          description: Owner account info or status
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/schemas.yaml#/components/schemas/APIResponseModel"
+    delete:
+      tags:
+        - Owner
+      summary: Delete owner account (challenge/confirm)
+      operationId: ownerDeleteAccount
+      security:
+        - SessionTokenAuth: []
+      requestBody:
+        description: "Owner account delete request (challenge/confirm)"
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "./schemas/schemas.yaml#/components/schemas/DeleteOwnerRequest"
+      responses:
+        "200":
+          description: Account deleted (confirmation)
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/schemas.yaml#/components/schemas/APIResponseModel"
         "204":
-          description: Account deleted
+          description: Account deleted (no content)
 
   /owner/storage:
     post:
+      tags:
+        - Owner
       summary: Store or retrieve encrypted private data storage
       operationId: ownerStorage
       security:
@@ -108,6 +180,8 @@ paths:
               schema:
                 $ref: "./schemas/schemas.yaml#/components/schemas/APIResponseModel"
     get:
+      tags:
+        - Owner
       summary: Retrieve encrypted private data storage
       operationId: ownerStorageGet
       security:
@@ -119,6 +193,29 @@ paths:
             application/json:
               schema:
                 $ref: "./schemas/schemas.yaml#/components/schemas/APIResponseModel"
+    delete:
+      tags:
+        - Owner
+      summary: Delete owner private storage (challenge/confirm)
+      operationId: ownerStorageDelete
+      security:
+        - SessionTokenAuth: []
+      requestBody:
+        description: "Owner storage delete request (challenge/confirm)"
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "./schemas/schemas.yaml#/components/schemas/OwnerStorageDeleteRequest"
+      responses:
+        "200":
+          description: Storage deleted (confirmation)
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/schemas.yaml#/components/schemas/APIResponseModel"
+        "204":
+          description: Storage deleted (no content)
 components:
   securitySchemes:
     SessionTokenAuth:

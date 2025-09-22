@@ -3,33 +3,30 @@ import importlib.util
 from collections import OrderedDict
 from pydantic import TypeAdapter, BaseModel
 import yaml
-import json
 import sys
 from pathlib import Path
-from helper import load_config, build_path
+from typing import Any, Dict, List, Optional
+from helper import Config, patch_const_to_enum, dictify, update_refs, fix_nullable_fields_deep, patch_anyof_nullables
+
+# --------- UTILS AND HELPERS ---------
 
 
-def scan_directory_for_models(directory, recursive=True):
-
+def scan_directory_for_models(directory: str, recursive: bool = True) -> List[Path]:
+    """Scan a directory for Python model files for debugging or test importing."""
     base_path = Path(directory)
     pattern = "**/*.py" if recursive else "*.py"
-
     original_path = sys.path.copy()
     if str(base_path) not in sys.path:
         sys.path.insert(0, str(base_path))
-
     if str(base_path.parent) not in sys.path:
         sys.path.insert(0, str(base_path.parent))
-
     imported_modules = []
-
     try:
         for py_file in base_path.glob(pattern):
             if any(part.startswith('.') or part == '__pycache__' for part in py_file.parts):
                 continue
             if py_file.name.startswith('test_') or py_file.name.endswith('_test.py'):
                 continue
-
             try:
                 spec = importlib.util.spec_from_file_location("temp_module", py_file)
                 if spec and spec.loader:
@@ -38,15 +35,23 @@ def scan_directory_for_models(directory, recursive=True):
                     imported_modules.append(py_file.relative_to(base_path))
             except Exception as e:
                 print(f"Warning: Could not import {py_file.name}: {e}")
-
     finally:
-        # Restore original path
         sys.path = original_path
-
     return imported_modules
 
 
-def get_models_from_registry():
+def safe_import(modulename: str, classname: str) -> Optional[Any]:
+    """Safely import a class from a module."""
+    try:
+        module = import_module(modulename)
+        model_class = getattr(module, classname)
+        return model_class
+    except Exception as e:
+        print(f"Error importing {modulename}:{classname} -> {e}")
+        return None
+
+
+def get_models_from_registry() -> Dict[str, Any]:
     try:
         from shared.api import minimal_registry as registry
         return registry.get_registered_models()
@@ -55,21 +60,22 @@ def get_models_from_registry():
         return {}
 
 
-def validate_models(model_sources):
-    """Compact validation: Pydantic models + Response discriminators"""
+def validate_models(model_sources: Dict[str, Any]) -> bool:
+    """Validate Pydantic models and discriminators for response/request models."""
     validation_issues = []
     valid_models = []
     response_models = []
-
-    # Get response models from registry if available
+    request_models = []
+    # Try to get union response/request models if registry provides them
     try:
         from shared.api import minimal_registry as registry
         response_registry = getattr(registry, 'get_response_models', lambda: {})()
-    except:
+        request_registry = getattr(registry, 'get_request_models', lambda: {})()
+    except Exception:
         response_registry = {}
+        request_registry = {}
 
     for model_name, import_path in model_sources.items():
-        # Extract model class
         if isinstance(import_path, dict):
             model_class = import_path.get('class')
             if model_class is None:
@@ -82,11 +88,10 @@ def validate_models(model_sources):
                 if model_class is None:
                     validation_issues.append(f"Could not import {model_name}")
                     continue
-            except:
+            except Exception:
                 validation_issues.append(f"Invalid import path for {model_name}")
                 continue
-
-        # Validation 1: Test schema generation
+        # Schema generation check
         try:
             if isinstance(model_class, type) and issubclass(model_class, BaseModel):
                 schema = model_class.model_json_schema()
@@ -96,128 +101,50 @@ def validate_models(model_sources):
         except Exception as e:
             validation_issues.append(f"Schema generation failed for {model_name}: {e}")
             continue
-
-        # Validation 2: Response model discriminator check
+        # Response model "kind" discriminator check
         if model_name in response_registry:
             response_models.append(model_name)
-
-            # Check for 'kind' field
-            if hasattr(model_class, 'model_fields'):
-                fields = model_class.model_fields
-            else:
-                fields = {}
-
+            fields = getattr(model_class, 'model_fields', {})
             if 'kind' not in fields:
                 validation_issues.append(f"Response model {model_name} missing 'kind' field for discriminator")
-
-    # Print validation summary
+        # Request union discriminator check
+        if model_name in request_registry:
+            request_models.append(model_name)
+            fields = getattr(model_class, 'model_fields', {})
+            if 'data' in fields:
+                sub_ann = fields['data'].annotation
+                if hasattr(sub_ann, '__args__'):
+                    for submodel in sub_ann.__args__:
+                        if hasattr(submodel, 'model_fields') and 'kind' not in submodel.model_fields:
+                            validation_issues.append(f"Request submodel {getattr(submodel, '__name__', str(submodel))} in {model_name} missing 'kind' field for discriminator")
+    # Summary Output
     if validation_issues:
         print("⚠️ Validation Issues:")
-        for issue in validation_issues[:5]:  # Show first 5
-            print(f"  • {issue}")
+        for issue in validation_issues[:5]:
+            print(f" • {issue}")
         if len(validation_issues) > 5:
-            print(f"  ... and {len(validation_issues) - 5} more")
-
+            print(f" ... and {len(validation_issues)-5} more")
     print(f"✅ Validated {len(valid_models)} models")
     if response_models:
-        print(f"🏷️  Found {len(response_models)} response models")
-
+        print(f"🏷️ Found {len(response_models)} response models")
+    if request_models:
+        print(f"🏷️ Found {len(request_models)} request models with unions/discriminators")
     return len(validation_issues) == 0
 
 
-# Load config
-config = load_config("config.json5")
-
-# Get paths from config
-schema_dir = build_path(config["schema_file"])
-input_dir = build_path(config["input_dir"])
-schema_file = build_path(config["schema_file"])
-
-# Add input_dir to sys.path
-sys.path.insert(0, str(input_dir))
-
-all_schemas = OrderedDict()
-global_defs = OrderedDict()
-
-
-def dictify(obj):
-    # Recursively convert OrderedDict/list to dict/list
-    if isinstance(obj, OrderedDict):
-        return {k: dictify(v) for k, v in sorted(obj.items())}
-    if isinstance(obj, dict):
-        return {k: dictify(v) for k, v in sorted(obj.items())}
-    if isinstance(obj, list):
-        return [dictify(i) for i in obj]
-    return obj
-
-
-def update_refs(obj):
-    """Recursively update $ref links to OpenAPI 3.x style."""
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            # $ref key
-            if k == "$ref" and isinstance(v, str) and v.startswith("#/$defs/"):
-                obj[k] = v.replace("#/$defs/", "#/components/schemas/")
-            # Discriminator mapping or other string values
-            elif isinstance(v, str) and v.startswith("#/$defs/"):
-                obj[k] = v.replace("#/$defs/", "#/components/schemas/")
-            else:
-                update_refs(v)
-    elif isinstance(obj, list):
-        for item in obj:
-            update_refs(item)
-
-
-def fix_nullable_fields_deep(schema):
-    if isinstance(schema, dict):
-        # Patch ANY dict mit anyOf/$ref/null
-        if "anyOf" in schema:
-            items = schema["anyOf"]
-            non_null = [i for i in items if i.get("type") != "null"]
-            has_null = any(i.get("type") == "null" for i in items)
-
-            if has_null and non_null:
-                del schema["anyOf"]
-                if non_null[0].get("$ref"):
-                    schema["$ref"] = non_null[0]["$ref"]
-                elif non_null[0].get("type"):
-                    schema["type"] = non_null[0]["type"]
-                schema["nullable"] = True
-
-        # Rekursiv für alle Dict- und List-Elemente
-        for k, v in list(schema.items()):
-            fix_nullable_fields_deep(v)
-    elif isinstance(schema, list):
-        for item in schema:
-            fix_nullable_fields_deep(item)
-
-
-def safe_import(modulename, classname):
-    try:
-        module = import_module(modulename)
-        model_class = getattr(module, classname)
-        return model_class
-    except Exception as e:
-        print(f"Error importing {modulename}:{classname} -> {e}")
-        return None
-
-
-def process_model_sources(model_sources):
-    """Process models from manual config or registry"""
+def process_model_sources(model_sources: Dict[str, Any], global_defs: OrderedDict):
+    """Process models for schema extraction, collect all $defs and merge conflicts."""
     processed_models = []
     for model_name, import_path in model_sources.items():
         if isinstance(import_path, dict):
-            # Registry format: {'class': ModelClass, 'module': '...', ...}
             model_class = import_path.get('class')
             if model_class is None:
                 continue
         else:
-            # Traditional format: "module:classname"
             modulename, classname = import_path.split(":")
             model_class = safe_import(modulename, classname)
             if model_class is None:
                 continue
-
         try:
             if isinstance(model_class, type) and issubclass(model_class, BaseModel):
                 schema = model_class.model_json_schema()
@@ -226,7 +153,7 @@ def process_model_sources(model_sources):
         except Exception as e:
             print(f"Error generating schema for {model_name}: {e}")
             continue
-
+        # Collect $defs
         if "$defs" in schema:
             for def_key, def_val in schema["$defs"].items():
                 if def_key not in global_defs:
@@ -234,72 +161,83 @@ def process_model_sources(model_sources):
                 elif global_defs[def_key] != def_val:
                     print(f"Warning: Conflicting definition for {def_key}")
             del schema["$defs"]
-
         global_defs[model_name] = schema
         processed_models.append(model_name)
-
+    # Pretty model table
     columns = 4
     for i in range(0, len(processed_models), columns):
         row = processed_models[i:i + columns]
-        # Fülle leere Spalten auf falls nötig
         while len(row) < columns:
             row.append("")
         print('\t'.join(f"{name:<{40}}" for name in row))
 
 
-# Main execution
+# --------- MAIN SCRIPT ---------
+
 if __name__ == "__main__":
+    print(f"🚀 Schema Generator for Lost & Found Platform")
+    print("=" * 60)
 
-    print(f"Scanning directory: {input_dir}")
-    imported_files = scan_directory_for_models(input_dir, recursive=True)
-    print(f"Imported {len(imported_files)} files")
+    config = Config.load("config.json5")
+    schema_file = config.get_path("schema_file")
+    input_dir = config.get_path("input_dir")
 
-    # 2. Try to get models from registry
+    print(f"📁 Scanning directory: {input_dir}")
+    imported_files = scan_directory_for_models(str(input_dir), recursive=True)
+    print(f"✅ Imported {len(imported_files)} Python files")
+
+    # Models
     registry_models = get_models_from_registry()
+    model_sources = {src["name"]: src["import"] for src in config.get_all_modelsources() if "name" in src and "import" in src}
 
-    # 3. Combine with manual config models (if any)
-    model_sources = config.get("modelsources", {})
-
-    # Prefer registry models over manual config
     if registry_models:
-        print(f"Using {len(registry_models)} models from registry")
+        print(f"📦 Found {len(registry_models)} models from registry")
         combined_sources = dict(registry_models)
-        # Add any manual models that aren't in registry
         for name, path in model_sources.items():
             if name not in combined_sources:
                 combined_sources[name] = path
     else:
-        print(f"Using {len(model_sources)} models from config")
+        print(f"📦 Found {len(model_sources)} models from config")
         combined_sources = model_sources
-
     if not combined_sources:
-        print("No models found to process")
+        print("❌ No models found – aborting")
         sys.exit(1)
 
-    print("\n📋 Validating models...")
+    print("\n🔍 Validating models...")
     validation_passed = validate_models(combined_sources)
     if not validation_passed:
-        print("⚠️  Continuing with issues - review warnings above")
+        print("\n⚠️ Validation completed with issues – see warnings above")
+    else:
+        print("\n✅ Validation successful – all models are processable!")
 
-    # 4. Process all models
-    process_model_sources(combined_sources)
+    print("\n📋 Generating schemas...")
+    global_defs = OrderedDict()
+    process_model_sources(combined_sources, global_defs)
 
-    # 5. Update refs and fix nullable fields
-    update_refs(global_defs)
-
+    print("\n🔧 Patching $ref and nullable fields...")
     combined_schema = {"components": {"schemas": dictify(global_defs)}}
-
     fix_nullable_fields_deep(combined_schema)
+    patch_anyof_nullables(combined_schema)
+    update_refs(combined_schema)
+    patch_const_to_enum(combined_schema)
 
-    # 6. Write output
+    print("\n📝 Writing output...")
     try:
         schema_file.parent.mkdir(parents=True, exist_ok=True)
         with open(schema_file, "w", encoding="UTF-8") as f:
             f.write("# This file is auto-generated from Pydantic models. Do not edit by hand!\n\n")
             yaml.dump(dictify(combined_schema), f, sort_keys=False)
-
-        print(f"Generated combined schema: {schema_file}")
-        print(f"Total schemas: {len(global_defs)}")
+        print(f"✅ Generated schema: {schema_file}")
+        print(f"📊 Total schemas: {len(global_defs)}")
     except Exception as e:
-        print(f"Error writing schema file: {e}")
+        print(f"❌ Error writing schema file: {e}")
         sys.exit(1)
+
+    print("\n📊 Summary:")
+    print(f" • Files imported: {len(imported_files)}")
+    print(f" • Models processed: {len(combined_sources)}")
+    print(f" • Schemas generated: {len(global_defs)}")
+    print(f" • Status: {'✅ PASS' if validation_passed else '❌ FAIL'}")
+    if not validation_passed:
+        print(" • Please review warnings and fix models if needed!")
+    print("\nDone.")
