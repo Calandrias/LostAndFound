@@ -1,187 +1,646 @@
 # This file is auto-generated from Pydantic models. Do not edit by hand!
 
-APIResponseModel:
-  additionalProperties: false
-  properties:
-    success:
-      description: True on successful request (HTTP 2xx)
-      title: Success
-      type: boolean
-    error:
-      anyOf:
-      - $ref: '#/$defs/ErrorModel'
-      - type: 'null'
-      default: null
-      description: Error object if success == False
-    data:
-      title: Data
-    allowedActions:
-      additionalProperties:
-        $ref: '#/$defs/ActionDetailModel'
-      description: Contains only allowed actions as keys. May be empty if no actions
-        allowed.
-      title: Allowedactions
+components:
+  schemas:
+    APIResponseModel:
+      additionalProperties: false
+      properties:
+        allowedActions:
+          additionalProperties:
+            $ref: '#/components/schemas/ActionDetailModel'
+          description: Contains only allowed actions as keys. May be empty if no actions
+            allowed.
+          title: Allowedactions
+          type: object
+        data:
+          discriminator:
+            mapping:
+              no_data: '#/components/schemas/NoData'
+              owner_response: '#/components/schemas/OwnerResponseModel'
+            propertyName: kind
+          oneOf:
+          - $ref: '#/components/schemas/OwnerResponseModel'
+          - $ref: '#/components/schemas/NoData'
+          title: Data
+        error:
+          $ref: '#/components/schemas/ErrorModel'
+          default: null
+          description: Error object if success == False
+          nullable: true
+        meta:
+          $ref: '#/components/schemas/MetaModel'
+          default: null
+          nullable: true
+        success:
+          description: True on successful request (HTTP 2xx)
+          title: Success
+          type: boolean
+      required:
+      - success
+      - data
+      title: APIResponseModel
       type: object
-    meta:
-      anyOf:
-      - $ref: '#/$defs/MetaModel'
-      - type: 'null'
-      default: null
-  required:
-  - success
-  - data
-  title: APIResponseModel
-  type: object
-LoginChallengeRequest:
-  additionalProperties: false
-  properties:
-    mode:
-      const: challenge
-      description: Get a challenge
-      title: Mode
-      type: string
-    owner_hash:
-      description: 'owner_hash: ''owner_'' + url-safe base64 (43 chars, e.g. SHA256-url-encoded
-        hash)'
-      maxLength: 49
-      minLength: 49
-      pattern: ^owner_[A-Za-z0-9_-]{43}$
-      title: Owner Hash
-      type: string
-    password_hash:
-      description: bcrypt hash string, 60 chars
-      maxLength: 60
-      minLength: 60
-      pattern: ^\$2[aby]\$[0-9]{2}\$[A-Za-z0-9./]{53}$
-      title: Password Hash
-      type: string
-  required:
-  - mode
-  - owner_hash
-  - password_hash
-  title: LoginChallengeRequest
-  type: object
-LoginResponseRequest:
-  additionalProperties: false
-  properties:
-    mode:
-      const: response
-      description: Respond to challenge
-      title: Mode
-      type: string
-    challenge_response:
-      title: Challenge Response
-      type: string
-  required:
-  - mode
-  - challenge_response
-  title: LoginResponseRequest
-  type: object
-LoginResponseDataModel:
-  additionalProperties: false
-  properties:
-    challenge:
-      anyOf:
-      - type: string
-      - type: 'null'
-      default: null
-      description: Challenge string the client must sign, only present if mode='challenge'
-      title: Challenge
-    expires_at:
-      description: Unix timestamp (seconds since epoch)
-      maximum: 4102444800
-      minimum: 0
-      title: Expires At
-      type: integer
-    session_token:
-      anyOf:
-      - type: string
-      - type: 'null'
-      default: null
-      description: Session token to be used for all future authenticated requests,
-        only set if mode='response'
-      title: Session Token
-  required:
-  - expires_at
-  title: LoginResponseDataModel
-  type: object
-$defs:
-  ActionDetailModel:
-    additionalProperties: false
-    properties:
-      endpoint:
-        description: API endpoint starting with / and not allowing external links
-        pattern: ^/[^/h].*
-        title: Endpoint
-        type: string
-      method:
-        enum:
-        - GET
-        - POST
-        - PUT
-        - DELETE
-        - PATCH
-        title: Method
-        type: string
-      rateLimit:
-        anyOf:
-        - type: integer
-        - type: 'null'
-        default: null
-        title: Ratelimit
-      rateWindow:
-        anyOf:
-        - type: string
-        - type: 'null'
-        default: null
-        title: Ratewindow
-      description:
-        description: 'Action description to be uses in UI '
-        maxLength: 4096
-        minLength: 0
-        pattern: ^[A-Za-z0-9+/= ]+\n?$
-        title: Description
-        type: string
-    required:
-    - endpoint
-    - method
-    - description
-    title: ActionDetailModel
-    type: object
-  ErrorModel:
-    additionalProperties: false
-    properties:
-      code:
-        title: Code
-        type: string
-      message:
-        title: Message
-        type: string
-    required:
-    - code
-    - message
-    title: ErrorModel
-    type: object
-  MetaModel:
-    additionalProperties: false
-    properties:
-      version:
-        anyOf:
-        - type: string
-        - type: 'null'
-        default: null
-        title: Version
-      ttlSeconds:
-        anyOf:
-        - type: integer
-        - type: 'null'
-        default: null
-        title: Ttlseconds
-      requestId:
-        anyOf:
-        - type: string
-        - type: 'null'
-        default: null
-        title: Requestid
-    title: MetaModel
-    type: object
+    ActionDetailModel:
+      additionalProperties: false
+      properties:
+        description:
+          description: 'Action description to be uses in UI '
+          maxLength: 4096
+          minLength: 0
+          pattern: ^[A-Za-z0-9+/= ]+\n?$
+          title: Description
+          type: string
+        endpoint:
+          description: API endpoint starting with / and not allowing external links
+          pattern: ^/[^/h].*
+          title: Endpoint
+          type: string
+        method:
+          enum:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          title: Method
+          type: string
+        rateLimit:
+          default: null
+          nullable: true
+          title: Ratelimit
+          type: integer
+        rateWindow:
+          default: null
+          nullable: true
+          title: Ratewindow
+          type: string
+      required:
+      - endpoint
+      - method
+      - description
+      title: ActionDetailModel
+      type: object
+    DeleteOwnerChallengeRequest:
+      additionalProperties: false
+      properties:
+        kind:
+          const: delete_owner_challange
+          default: delete_owner_challange
+          title: Kind
+          type: string
+        owner_hash:
+          $ref: '#/components/schemas/OwnerHash'
+      required:
+      - owner_hash
+      title: DeleteOwnerChallengeRequest
+      type: object
+    DeleteOwnerChallengeResponse:
+      additionalProperties: false
+      properties:
+        challenge_text:
+          description: 'Instruction: Type e.g ''DELETE-OWNER'' to confirm account
+            deletion'
+          title: Challenge Text
+          type: string
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: Expiration time of the challenge
+        kind:
+          const: delete_owner_challenge
+          default: delete_owner_challenge
+          title: Kind
+          type: string
+      required:
+      - challenge_text
+      - expires_at
+      title: DeleteOwnerChallengeResponse
+      type: object
+    DeleteOwnerConfirmRequest:
+      additionalProperties: false
+      properties:
+        confirmation_text:
+          description: User must type 'DELETE-OWNER' to confirm
+          title: Confirmation Text
+          type: string
+        kind:
+          const: delete_owner_confirm
+          default: delete_owner_confirm
+          title: Kind
+          type: string
+      required:
+      - confirmation_text
+      title: DeleteOwnerConfirmRequest
+      type: object
+    DeleteOwnerConfirmResponse:
+      additionalProperties: false
+      properties:
+        deleted:
+          description: True if account was deleted
+          title: Deleted
+          type: boolean
+        kind:
+          const: delete_owner_confirm
+          default: delete_owner_confirm
+          title: Kind
+          type: string
+      required:
+      - deleted
+      title: DeleteOwnerConfirmResponse
+      type: object
+    DeleteOwnerRequest:
+      additionalProperties: false
+      properties:
+        data:
+          discriminator:
+            mapping:
+              delete_owner_challange: '#/components/schemas/DeleteOwnerChallengeRequest'
+              delete_owner_confirm: '#/components/schemas/DeleteOwnerConfirmRequest'
+            propertyName: kind
+          oneOf:
+          - $ref: '#/components/schemas/DeleteOwnerChallengeRequest'
+          - $ref: '#/components/schemas/DeleteOwnerConfirmRequest'
+          title: Data
+      required:
+      - data
+      title: DeleteOwnerRequest
+      type: object
+    ErrorModel:
+      additionalProperties: false
+      properties:
+        code:
+          title: Code
+          type: string
+        message:
+          title: Message
+          type: string
+      required:
+      - code
+      - message
+      title: ErrorModel
+      type: object
+    LoginChallengeRequest:
+      additionalProperties: false
+      properties:
+        kind:
+          const: login_challenge
+          default: login_challenge
+          title: Kind
+          type: string
+        owner_hash:
+          $ref: '#/components/schemas/OwnerHash'
+        password_hash:
+          $ref: '#/components/schemas/PasswordHash'
+      required:
+      - owner_hash
+      - password_hash
+      title: LoginChallengeRequest
+      type: object
+    LoginChallengeResponseDataModel:
+      additionalProperties: false
+      properties:
+        challenge:
+          description: Challenge string the client must sign
+          title: Challenge
+          type: string
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: Expiration time of the challenge and session token
+        kind:
+          const: login_challenge
+          default: login_challenge
+          title: Kind
+          type: string
+      required:
+      - challenge
+      - expires_at
+      title: LoginChallengeResponseDataModel
+      type: object
+    LoginRequest:
+      additionalProperties: false
+      properties:
+        data:
+          discriminator:
+            mapping:
+              login_challenge: '#/components/schemas/LoginChallengeRequest'
+              login_response: '#/components/schemas/LoginResponseRequest'
+            propertyName: kind
+          oneOf:
+          - $ref: '#/components/schemas/LoginChallengeRequest'
+          - $ref: '#/components/schemas/LoginResponseRequest'
+          title: Data
+      required:
+      - data
+      title: LoginRequest
+      type: object
+    LoginResponseRequest:
+      additionalProperties: false
+      properties:
+        challenge_response:
+          title: Challenge Response
+          type: string
+        kind:
+          const: login_response
+          default: login_response
+          title: Kind
+          type: string
+      required:
+      - challenge_response
+      title: LoginResponseRequest
+      type: object
+    LoginSessionResponseDataModel:
+      additionalProperties: false
+      properties:
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: Expiration time of the session token
+        kind:
+          const: login_response
+          default: login_response
+          title: Kind
+          type: string
+      required:
+      - expires_at
+      title: LoginSessionResponseDataModel
+      type: object
+    MetaModel:
+      additionalProperties: false
+      properties:
+        requestId:
+          default: null
+          nullable: true
+          title: Requestid
+          type: string
+        ttlSeconds:
+          default: null
+          nullable: true
+          title: Ttlseconds
+          type: integer
+        version:
+          default: null
+          nullable: true
+          title: Version
+          type: string
+      title: MetaModel
+      type: object
+    NoData:
+      additionalProperties: false
+      properties:
+        kind:
+          const: no_data
+          default: no_data
+          title: Kind
+          type: string
+      title: NoData
+      type: object
+    OnboardingInitRequest:
+      additionalProperties: false
+      properties:
+        kind:
+          const: onboarding_init
+          default: onboarding_init
+          title: Kind
+          type: string
+        owner_hash:
+          $ref: '#/components/schemas/OwnerHash'
+        password_hash:
+          $ref: '#/components/schemas/PasswordHash'
+      required:
+      - owner_hash
+      - password_hash
+      title: OnboardingInitRequest
+      type: object
+    OnboardingInitResponse:
+      additionalProperties: false
+      properties:
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: Expiration time of the session token
+        kind:
+          const: onboarding_init
+          default: onboarding_init
+          title: Kind
+          type: string
+        random_entropy:
+          description: Random entropy for cryptographic purposes
+          title: Random Entropy
+          type: string
+      required:
+      - random_entropy
+      - expires_at
+      title: OnboardingInitResponse
+      type: object
+    OnboardingPublicKeyRequest:
+      additionalProperties: false
+      properties:
+        kind:
+          const: onboarding_public_key
+          default: onboarding_public_key
+          title: Kind
+          type: string
+        public_key:
+          $ref: '#/components/schemas/PublicKey'
+          description: Owner's public key in PEM format
+      required:
+      - public_key
+      title: OnboardingPublicKeyRequest
+      type: object
+    OnboardingPublicKeyResponse:
+      additionalProperties: false
+      properties:
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: Timestamp when the owner account was created
+        kind:
+          const: onboarding_public_key
+          default: onboarding_public_key
+          title: Kind
+          type: string
+      required:
+      - created_at
+      title: OnboardingPublicKeyResponse
+      type: object
+    OnboardingRequest:
+      additionalProperties: false
+      properties:
+        data:
+          discriminator:
+            mapping:
+              onboarding_init: '#/components/schemas/OnboardingInitRequest'
+              onboarding_public_key: '#/components/schemas/OnboardingPublicKeyRequest'
+            propertyName: kind
+          oneOf:
+          - $ref: '#/components/schemas/OnboardingInitRequest'
+          - $ref: '#/components/schemas/OnboardingPublicKeyRequest'
+          title: Data
+      required:
+      - data
+      title: OnboardingRequest
+      type: object
+    OwnerHash:
+      description: Hash for owner identifiers (must start with 'owner_').
+      properties:
+        value:
+          description: 'owner_hash: ''owner_'' + url-safe base64 (43 chars, e.g. SHA256-url-encoded
+            hash)'
+          maxLength: 49
+          minLength: 49
+          pattern: ^owner_[A-Za-z0-9_-]{43}$
+          title: Value
+          type: string
+      required:
+      - value
+      title: OwnerHash
+      type: object
+    OwnerResponseModel:
+      additionalProperties: false
+      properties:
+        data:
+          discriminator:
+            mapping:
+              delete_owner_challenge: '#/components/schemas/DeleteOwnerChallengeResponse'
+              delete_owner_confirm: '#/components/schemas/DeleteOwnerConfirmResponse'
+              login_challenge: '#/components/schemas/LoginChallengeResponseDataModel'
+              login_response: '#/components/schemas/LoginSessionResponseDataModel'
+              no_data: '#/components/schemas/NoData'
+              onboarding_init: '#/components/schemas/OnboardingInitResponse'
+              onboarding_public_key: '#/components/schemas/OnboardingPublicKeyResponse'
+              owner_storage: '#/components/schemas/OwnerStorageResponse'
+              session_refresh: '#/components/schemas/SessionRefreshResponse'
+              storage_delete_challenge: '#/components/schemas/OwnerStorageDeleteChallangeResponse'
+              storage_delete_confirm: '#/components/schemas/OwnerStorageDeleteConfirmResponse'
+            propertyName: kind
+          oneOf:
+          - $ref: '#/components/schemas/LoginChallengeResponseDataModel'
+          - $ref: '#/components/schemas/LoginSessionResponseDataModel'
+          - $ref: '#/components/schemas/OnboardingInitResponse'
+          - $ref: '#/components/schemas/OnboardingPublicKeyResponse'
+          - $ref: '#/components/schemas/DeleteOwnerChallengeResponse'
+          - $ref: '#/components/schemas/DeleteOwnerConfirmResponse'
+          - $ref: '#/components/schemas/SessionRefreshResponse'
+          - $ref: '#/components/schemas/OwnerStorageResponse'
+          - $ref: '#/components/schemas/OwnerStorageDeleteChallangeResponse'
+          - $ref: '#/components/schemas/OwnerStorageDeleteConfirmResponse'
+          - $ref: '#/components/schemas/NoData'
+          title: Data
+        kind:
+          const: owner_response
+          default: owner_response
+          title: Kind
+          type: string
+      required:
+      - data
+      title: OwnerResponseModel
+      type: object
+    OwnerStorageDeleteChallangeResponse:
+      additionalProperties: false
+      properties:
+        challenge_text:
+          description: 'Instruction: Type e.g ''DELETE-STORAGE'' to confirm account
+            deletion'
+          title: Challenge Text
+          type: string
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: Expiration time of the challenge
+        kind:
+          const: storage_delete_challenge
+          default: storage_delete_challenge
+          title: Kind
+          type: string
+      required:
+      - challenge_text
+      - expires_at
+      title: OwnerStorageDeleteChallangeResponse
+      type: object
+    OwnerStorageDeleteChallengeRequest:
+      additionalProperties: false
+      properties:
+        kind:
+          const: storage_delete_challenge
+          default: storage_delete_challenge
+          title: Kind
+          type: string
+        owner_hash:
+          $ref: '#/components/schemas/OwnerHash'
+      required:
+      - owner_hash
+      title: OwnerStorageDeleteChallengeRequest
+      type: object
+    OwnerStorageDeleteConfirmRequest:
+      additionalProperties: false
+      properties:
+        confirmation_text:
+          description: User must type e.g. 'DELETE-STORAGE' to confirm
+          title: Confirmation Text
+          type: string
+        kind:
+          const: storage_delete_confirm
+          default: storage_delete_confirm
+          title: Kind
+          type: string
+      required:
+      - confirmation_text
+      title: OwnerStorageDeleteConfirmRequest
+      type: object
+    OwnerStorageDeleteConfirmResponse:
+      additionalProperties: false
+      properties:
+        deleted:
+          description: True if storage was deleted
+          title: Deleted
+          type: boolean
+        kind:
+          const: storage_delete_confirm
+          default: storage_delete_confirm
+          title: Kind
+          type: string
+      required:
+      - deleted
+      title: OwnerStorageDeleteConfirmResponse
+      type: object
+    OwnerStorageDeleteRequest:
+      additionalProperties: false
+      properties:
+        data:
+          discriminator:
+            mapping:
+              storage_delete_challenge: '#/components/schemas/OwnerStorageDeleteChallengeRequest'
+              storage_delete_confirm: '#/components/schemas/OwnerStorageDeleteConfirmRequest'
+            propertyName: kind
+          oneOf:
+          - $ref: '#/components/schemas/OwnerStorageDeleteChallengeRequest'
+          - $ref: '#/components/schemas/OwnerStorageDeleteConfirmRequest'
+          title: Data
+      required:
+      - data
+      title: OwnerStorageDeleteRequest
+      type: object
+    OwnerStorageResponse:
+      additionalProperties: false
+      properties:
+        encrypted_storage:
+          description: Base64-encoded, optionally gzip-compressed, encrypted private
+            data
+          title: Encrypted Storage
+          type: string
+        kind:
+          const: owner_storage
+          default: owner_storage
+          title: Kind
+          type: string
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: Timestamp of last update
+      required:
+      - encrypted_storage
+      - updated_at
+      title: OwnerStorageResponse
+      type: object
+    OwnerStorageWriteRequest:
+      additionalProperties: false
+      properties:
+        encrypted_storage:
+          description: Base64-encoded, optionally gzip-compressed, encrypted private
+            data
+          title: Encrypted Storage
+          type: string
+      required:
+      - encrypted_storage
+      title: OwnerStorageWriteRequest
+      type: object
+    PasswordHash:
+      additionalProperties: false
+      properties:
+        value:
+          description: bcrypt hash string, 60 chars
+          maxLength: 60
+          minLength: 60
+          pattern: ^\$2[aby]\$[0-9]{2}\$[A-Za-z0-9./]{53}$
+          title: Value
+          type: string
+      required:
+      - value
+      title: PasswordHash
+      type: object
+    PublicKey:
+      properties:
+        value:
+          description: PEM encoded public key
+          maxLength: 800
+          minLength: 272
+          pattern: ^-----BEGIN PUBLIC KEY-----(.|\n)+-----END PUBLIC KEY-----\n?$
+          title: Value
+          type: string
+      required:
+      - value
+      title: PublicKey
+      type: object
+    SessionRefreshRequest:
+      additionalProperties: false
+      properties:
+        kind:
+          const: session_refresh
+          default: session_refresh
+          title: Kind
+          type: string
+      title: SessionRefreshRequest
+      type: object
+    SessionRefreshResponse:
+      additionalProperties: false
+      properties:
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: New expiration time of the refreshed session token
+        kind:
+          const: session_refresh
+          default: session_refresh
+          title: Kind
+          type: string
+      required:
+      - expires_at
+      title: SessionRefreshResponse
+      type: object
+    SessionToken:
+      description: Field for session tokens (must start with 'sessiontok_').
+      properties:
+        value:
+          description: 'session_token: ''sessiontok_'' + url-safe base64 random value
+            with 43 to 86 chars'
+          maxLength: 97
+          minLength: 54
+          pattern: ^sessiontok_[A-Za-z0-9\-_]{43,86}$
+          title: Value
+          type: string
+      required:
+      - value
+      title: SessionToken
+      type: object
+    TagCode:
+      description: Field for public QR tag codes (must start with 'tag_').
+      properties:
+        value:
+          description: 'tag_code: ''tag_'' + public code with 32 to 64 alphanumeric
+            chars'
+          maxLength: 68
+          minLength: 36
+          pattern: ^tag_[A-Z0-9_-]{32,64}$
+          title: Value
+          type: string
+      required:
+      - value
+      title: TagCode
+      type: object
+    Timestamp:
+      description: Unix timestamp (seconds since epoch).
+      properties:
+        value:
+          description: Unix timestamp (seconds since epoch) between 2025-01-01 and
+            2050-12-31
+          maximum: 2556057599
+          minimum: 1735689600
+          title: Value
+          type: integer
+      required:
+      - value
+      title: Timestamp
+      type: object

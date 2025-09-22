@@ -1,11 +1,18 @@
 from pydantic import Field, BaseModel, ConfigDict, StrictStr, StrictInt
-from typing import ClassVar
+from typing import ClassVar, Literal
+
+from shared.api.minimal_registry import generic_model, owner_model
 
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", from_attributes=True)
 
 
+class NoData(StrictModel):
+    kind: Literal["no_data"] = "no_data"
+
+
+@generic_model
 class OwnerHash(BaseModel):
     """Hash for owner identifiers (must start with 'owner_')."""
     prefix: ClassVar[str] = "owner_"
@@ -20,6 +27,7 @@ class OwnerHash(BaseModel):
     )
 
 
+@generic_model
 class TagCode(BaseModel):
     """Field for public QR tag codes (must start with 'tag_')."""
     prefix: ClassVar[str] = "tag_"
@@ -34,6 +42,8 @@ class TagCode(BaseModel):
         description=f"tag_code: '{prefix}' + public code with {min_code} to {max_code} alphanumeric chars",
     )
 
+
+@generic_model
 class SessionToken(BaseModel):
     """Field for session tokens (must start with 'sessiontok_')."""
     prefix: ClassVar[str] = "sessiontok_"
@@ -48,15 +58,19 @@ class SessionToken(BaseModel):
         description=f"session_token: '{prefix}' + url-safe base64 random value with {min_length} to {max_length} chars",
     )
 
+
+@generic_model
 class Timestamp(BaseModel):
     """Unix timestamp (seconds since epoch)."""
     value: StrictInt = Field(
         ...,
-        ge=0,
-        le=4102444800,  # Year 2100
-        description="Unix timestamp (seconds since epoch)",
+        ge=1735689600,  # 2025-01-01
+        le=2556057599,  # 2050-12-31
+        description="Unix timestamp (seconds since epoch) between 2025-01-01 and 2050-12-31",
     )
 
+
+@generic_model
 class PublicKey(BaseModel):
     pattern: ClassVar[str] = r'^-----BEGIN PUBLIC KEY-----(.|\n)+-----END PUBLIC KEY-----\n?$'
     min_length: ClassVar[int] = 272

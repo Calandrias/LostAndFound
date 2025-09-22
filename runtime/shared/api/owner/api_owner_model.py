@@ -1,24 +1,177 @@
-from typing import Literal, Optional
-from pydantic import Field, StrictStr, StrictInt
+from typing import Literal, Annotated, Union
+from pydantic import Field, StrictStr
 
-from shared.com.identifier_model import StrictModel, OwnerHash, Timestamp, PublicKey
+from shared.api.minimal_registry import owner_model
+from shared.com.identifier_model import StrictModel, OwnerHash, Timestamp, PublicKey, NoData
 from shared.db.owner.owner_model import PasswordHash
 
 
-class LoginChallengeRequest(StrictModel):
-    mode: Literal["challenge"] = Field(..., description="Get a challenge")
+# Onboarding Flow Models
+@owner_model
+class OnboardingInitRequest(StrictModel):
+    kind: Literal["onboarding_init"] = "onboarding_init"
     owner_hash: OwnerHash
     password_hash: PasswordHash
 
 
+@owner_model
+class OnboardingPublicKeyRequest(StrictModel):
+    kind: Literal["onboarding_public_key"] = "onboarding_public_key"
+    public_key: PublicKey = Field(..., description="Owner's public key in PEM format")
+
+
+@owner_model(req_res="request")
+class OnboardingRequest(StrictModel):
+    data: Annotated[Union[OnboardingInitRequest, OnboardingPublicKeyRequest], Field(discriminator="kind")]
+
+
+@owner_model(req_res="response")
+class OnboardingInitResponse(StrictModel):
+    kind: Literal["onboarding_init"] = "onboarding_init"
+    random_entropy: StrictStr = Field(..., description="Random entropy for cryptographic purposes")
+    expires_at: Timestamp = Field(..., description="Expiration time of the session token")
+
+
+@owner_model(req_res="response")
+class OnboardingPublicKeyResponse(StrictModel):
+    kind: Literal["onboarding_public_key"] = "onboarding_public_key"
+    created_at: Timestamp = Field(..., description="Timestamp when the owner account was created")
+
+
+# Login Flow Models
+@owner_model()
+class LoginChallengeRequest(StrictModel):
+    kind: Literal["login_challenge"] = "login_challenge"
+    owner_hash: OwnerHash
+    password_hash: PasswordHash
+
+
+@owner_model()
 class LoginResponseRequest(StrictModel):
-    mode: Literal["response"] = Field(..., description="Respond to challenge")
+    kind: Literal["login_response"] = "login_response"
     challenge_response: str
 
 
-class LoginResponseDataModel(StrictModel):
-    # Step 1: Sending challenge
-    challenge: Optional[StrictStr] = Field(None, description="Challenge string the client must sign, only present if mode='challenge'")
-    expires_at: Timestamp
-    # Step 2: Returning a session token
-    session_token: Optional[StrictStr] = Field(None, description="Session token to be used for all future authenticated requests, only set if mode='response'")
+@owner_model(req_res="request")
+class LoginRequest(StrictModel):
+    data: Annotated[Union[LoginChallengeRequest, LoginResponseRequest], Field(discriminator="kind")]
+
+
+@owner_model(req_res="response")
+class LoginChallengeResponseDataModel(StrictModel):
+    kind: Literal["login_challenge"] = "login_challenge"
+    challenge: StrictStr = Field(..., description="Challenge string the client must sign")
+    expires_at: Timestamp = Field(..., description="Expiration time of the challenge and session token")
+
+
+@owner_model(req_res="response")
+class LoginSessionResponseDataModel(StrictModel):
+    kind: Literal["login_response"] = "login_response"
+    expires_at: Timestamp = Field(..., description="Expiration time of the session token")
+
+
+# Delete Owner Account Flow
+
+
+@owner_model
+class DeleteOwnerChallengeRequest(StrictModel):
+    kind: Literal["delete_owner_challange"] = "delete_owner_challange"
+    owner_hash: OwnerHash
+
+
+@owner_model
+class DeleteOwnerConfirmRequest(StrictModel):
+    kind: Literal["delete_owner_confirm"] = "delete_owner_confirm"
+    confirmation_text: StrictStr = Field(..., description="User must type 'DELETE-OWNER' to confirm")
+
+
+@owner_model(req_res="request")
+class DeleteOwnerRequest(StrictModel):
+    data: Annotated[Union[DeleteOwnerChallengeRequest, DeleteOwnerConfirmRequest], Field(discriminator="kind")]
+
+
+@owner_model(req_res="response")
+class DeleteOwnerChallengeResponse(StrictModel):
+    kind: Literal["delete_owner_challenge"] = "delete_owner_challenge"
+    challenge_text: StrictStr = Field(..., description="Instruction: Type e.g 'DELETE-OWNER' to confirm account deletion")
+    expires_at: Timestamp = Field(..., description="Expiration time of the challenge")
+
+
+@owner_model(req_res="response")
+class DeleteOwnerConfirmResponse(StrictModel):
+    kind: Literal["delete_owner_confirm"] = "delete_owner_confirm"
+    deleted: bool = Field(..., description="True if account was deleted")
+
+
+# Session flow
+@owner_model(req_res="request")
+class SessionRefreshRequest(StrictModel):
+    kind: Literal["session_refresh"] = "session_refresh"
+
+
+@owner_model(req_res="response")
+class SessionRefreshResponse(StrictModel):
+    kind: Literal["session_refresh"] = "session_refresh"
+    expires_at: Timestamp = Field(..., description="New expiration time of the refreshed session token")
+
+
+# Owner pivate storage flow
+@owner_model(req_res="request")
+class OwnerStorageWriteRequest(StrictModel):
+    encrypted_storage: StrictStr = Field(..., description="Base64-encoded, optionally gzip-compressed, encrypted private data")
+
+
+@owner_model
+class OwnerStorageDeleteChallengeRequest(StrictModel):
+    kind: Literal["storage_delete_challenge"] = "storage_delete_challenge"
+    owner_hash: OwnerHash
+
+
+@owner_model
+class OwnerStorageDeleteConfirmRequest(StrictModel):
+    kind: Literal["storage_delete_confirm"] = "storage_delete_confirm"
+    confirmation_text: StrictStr = Field(..., description="User must type e.g. 'DELETE-STORAGE' to confirm")
+
+
+@owner_model(req_res="request")
+class OwnerStorageDeleteRequest(StrictModel):
+    data: Annotated[Union[OwnerStorageDeleteChallengeRequest, OwnerStorageDeleteConfirmRequest], Field(discriminator="kind")]
+
+
+@owner_model(req_res="response")
+class OwnerStorageResponse(StrictModel):
+    kind: Literal["owner_storage"] = "owner_storage"
+    encrypted_storage: StrictStr = Field(..., description="Base64-encoded, optionally gzip-compressed, encrypted private data")
+    updated_at: Timestamp = Field(..., description="Timestamp of last update")
+
+
+@owner_model(req_res="response")
+class OwnerStorageDeleteChallangeResponse(StrictModel):
+    kind: Literal["storage_delete_challenge"] = "storage_delete_challenge"
+    challenge_text: StrictStr = Field(..., description="Instruction: Type e.g 'DELETE-STORAGE' to confirm account deletion")
+    expires_at: Timestamp = Field(..., description="Expiration time of the challenge")
+
+
+@owner_model(req_res="response")
+class OwnerStorageDeleteConfirmResponse(StrictModel):
+    kind: Literal["storage_delete_confirm"] = "storage_delete_confirm"
+    deleted: bool = Field(..., description="True if storage was deleted")
+
+
+# Owner Response Wrapper
+class OwnerResponseModel(StrictModel):
+    kind: Literal["owner_response"] = "owner_response"
+    data: Annotated[Union[
+        LoginChallengeResponseDataModel,
+        LoginSessionResponseDataModel,
+        OnboardingInitResponse,
+        OnboardingPublicKeyResponse,
+        DeleteOwnerChallengeResponse,
+        DeleteOwnerConfirmResponse,
+        SessionRefreshResponse,
+        OwnerStorageResponse,
+        OwnerStorageDeleteChallangeResponse,
+        OwnerStorageDeleteConfirmResponse,
+        NoData,
+    ],
+                    Field(discriminator="kind")]

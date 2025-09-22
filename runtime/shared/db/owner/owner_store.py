@@ -7,7 +7,7 @@ import boto3
 from pydantic import ValidationError, create_model, Field
 from botocore.exceptions import ClientError
 
-from shared.db.owner.owner_model import Owner, State, PasswordHash, PublicKey, Timestamp,OwnerHash
+from shared.db.owner.owner_model import Owner, State, PasswordHash, PublicKey, Timestamp, OwnerHash
 
 from shared.com.logging_utils import ProjectLogger
 from shared.com.shared_helper import current_unix_timestamp_utc, dynamodb_decimal_to_int
@@ -39,16 +39,14 @@ class OwnerHelper:
     ) -> Owner:
         """Creates a validated Owner object from fields, raises ValidationError if invalid."""
         _state = State(state) if isinstance(state, str) else state
-        return Owner(
-            owner_hash=OwnerHash(value=owner_hash),
-            salt=salt,
-            password_hash=PasswordHash(value=password_hash),
-            public_key=PublicKey(value=public_key),
-            random_entropy=random_entropy,
-            owner_encrypted_storage=owner_encrypted_storage or "",
-            created_at=Timestamp(value=created_at or current_unix_timestamp_utc()),
-            state=_state
-        )
+        return Owner(owner_hash=OwnerHash(value=owner_hash),
+                     salt=salt,
+                     password_hash=PasswordHash(value=password_hash),
+                     public_key=PublicKey(value=public_key),
+                     random_entropy=random_entropy,
+                     owner_encrypted_storage=owner_encrypted_storage or "",
+                     created_at=Timestamp(value=created_at or current_unix_timestamp_utc()),
+                     state=_state)
 
     @staticmethod
     def is_active(owner: Owner) -> bool:
@@ -75,12 +73,14 @@ class OwnerHelper:
     # Single-field validation via Pydantic V2
     @staticmethod
     def validate_field(field_name: str, value) -> bool:
-        """Uses Pydantic V2 to validate a single field of Owner, including constraints."""
+        """
+        Uses Pydantic to validate a single field of Owner, including constraints.
+        Returns True if valid, False otherwise. Also handles invalid field names and logs errors.
+        """
         try:
             field_info = Owner.model_fields[field_name]
             field_type = field_info.annotation
             field_constraints = field_info.metadata
-            # Build Field with constraints if present
             field_args = {}
             for k in ["min_length", "max_length", "pattern"]:
                 if k in field_constraints:
@@ -89,8 +89,8 @@ class OwnerHelper:
             temp_model = create_model("TempModel", **{field_name: (field_type, temp_field)})
             temp_model.model_validate({field_name: value})
             return True
-        except ValidationError:
-            logger.error(f"Owner field validation error: {field_name}")
+        except (ValidationError, KeyError, TypeError, ValueError) as e:
+            logger.error(f"Owner field validation error: {field_name}, value={value}, error={e}")
             return False
 
 
@@ -180,7 +180,7 @@ class OwnerStore:
         """Update a single field for an existing owner."""
         if field not in Owner.ALLOWED_UPDATE_FIELDS:
             raise ValueError(f"field >{field}< not part of Owner")
-        key_value = owner_hash.value if hasattr(owner_hash, "value") else owner_hash
+        key_value = owner_hash
         resp = self.table.update_item(
             Key={"owner_hash": key_value},
             UpdateExpression="SET #field = :val",

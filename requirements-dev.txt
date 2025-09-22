@@ -1,4 +1,5 @@
 -r infra/requirements.txt
+json5
 prance
 openapi-spec-validator
 pytest

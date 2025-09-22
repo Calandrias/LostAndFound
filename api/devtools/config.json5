@@ -1,0 +1,26 @@
+{
+  modelsources: {
+    // optional, not decorated models
+    //APIResponseModel: "shared.api.response_model:APIResponseModel",
+  },
+  input_dir: {
+    //"LostAndFound/runtime/shared
+    type: "relative", //alt: "absolut"
+    path: "runtime/shared",
+    up: 2,
+  }, // ../
+  output_dir: {
+    //"LostAndFound/api/generated
+    type: "relative", //alt: "absolut"
+    path: "generated",
+    up: 1,
+  },
+  schema_file: {
+    //"LostAndFound/api/schemas/schemas.yaml",
+    type: "relative", //alt: "absolut"
+    up: 1,
+    path: "schemas/schemas.yaml",
+  },
+  openapi_file: { type: "relative", up: 1, path: "openapi.yaml" },
+  temp_api_file: { type: "relative", up: 1, path: "temp.yaml" },
+}

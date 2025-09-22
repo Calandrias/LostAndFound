@@ -1,194 +1,128 @@
-openapi: 3.1.0
+openapi: 3.0.1
 info:
   title: Lost & Found QR Platform API
   version: "0.1"
 servers:
   - url: https://api.lostfound.example
 paths:
-  /tag/{hash}:
-    get:
-      summary: "Lookup a tag by hash (Tag Scan Entry Point)"
-      operationId: tagRedirect
-      description: >
-        Returns metadata and status for a scanned tag. No authentication required.
-        Handles 'unclaimed' (no owner yet) and 'claimed' (owned) states.
-        Does not expose owner contact or sensitive info.
-      parameters:
-        - name: hash
-          in: path
-          required: true
-          schema:
-            type: string
+  /owner/onboarding:
+    post:
+      summary: Owner Registration / Onboarding
+      operationId: ownerOnboarding
+      requestBody:
+        description: "User request to register or continue onboarding, discriminator should be 'onboarding_init' or 'onboarding_public_key'"
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "./schemas/schemas.yaml#/components/schemas/OnboardingRequest"
       responses:
-        "302":
-          description: "Redirect to Tag UI"
-          headers:
-            Location:
-              description: "Destination URL of the UI, including Tag-Hash"
+        "201":
+          description: Owner created or onboarding step completed
+          content:
+            application/json:
               schema:
-                type: string
-                example: "/ui/?tag={hash}"
-        "404":
-          description: Tag not found (invalid or deleted)
+                $ref: "./schemas/schemas.yaml#/components/schemas/APIResponseModel"
 
-/owner/onboarding:
-  post:
-    summary: Owner Registration / Onboarding
-    operationId: ownerOnboarding
-    requestBody:
-      content:
-        application/json:
-          schema:
-            $ref:
-    responses:
-      "201":
-        description: Owner created
+  /owner/login:
+    post:
+      summary: Owner Auth (Challenge/Response)
+      operationId: ownerLogin
+      security:
+        - {}
+        - SessionTokenAuth: []
+      requestBody:
+        description: "User login request, discriminator should be 'login_challenge' or 'login_response'"
+        required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/OnboardingResponse"
+              $ref: "./schemas/schemas.yaml#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Auth Step (challenge issued or session granted)
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/schemas.yaml#/components/schemas/APIResponseModel"
 
-/owner/login:
-  post:
-    summary: Owner Auth (Challenge/Response)
-    operationId: ownerLogin
-    requestBody:
-      content:
-        application/json:
-          schema:
-            $ref: "./schemas/schemas.yaml#components/schemas/LoginRequest"
-    responses:
-      "200":
-        description: Auth Step (challenge issued or session granted)
+  /owner/refresh:
+    post:
+      summary: Refresh a session token
+      operationId: ownerSessionRefresh
+      security:
+        - SessionTokenAuth: []
+      requestBody:
+        description: "User request to refresh session token, discriminator should be 'session_refresh'"
+        required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoginResponse"
+              $ref: "./schemas/schemas.yaml#/components/schemas/SessionRefreshRequest"
 
-/owner/session/refresh:
-  post:
-    summary: Refresh a session token
-    operationId: ownerSessionRefresh
-    requestBody:
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/SessionRefreshRequest"
-    responses:
-      "200":
-        description: Refreshed session token
+      responses:
+        "200":
+          description: Refreshed session token
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/schemas.yaml#/components/schemas/APIResponseModel"
+
+  /owner/logout:
+    post:
+      summary: Invalidate session token (logout)
+      operationId: ownerLogout
+      security:
+        - SessionTokenAuth: []
+      responses:
+        "204":
+          description: Logged out
+
+  /owner/delete:
+    post:
+      summary: Owner account delete (self-service)
+      operationId: ownerDelete
+      security:
+        - SessionTokenAuth: []
+      responses:
+        "204":
+          description: Account deleted
+
+  /owner/storage:
+    post:
+      summary: Store or retrieve encrypted private data storage
+      operationId: ownerStorage
+      security:
+        - SessionTokenAuth: []
+      requestBody:
+        description: "User request to store or retrieve encrypted private data, discriminator should be 'owner_storage'"
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SessionRefreshResponse"
-
-/owner/storage:
-  get:
-    summary: Get encrypted private storage
-    operationId: getOwnerStorage
-    responses:
-      "200":
-        description: Encrypted storage returned
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/EncryptedStorageResponse"
-  patch:
-    summary: Update encrypted private storage
-    operationId: updateOwnerStorage
-    requestBody:
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/EncryptedStorageRequest"
-    responses:
-      "200":
-        description: Storage updated
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/EncryptedStorageResponse"
-
-/owner/logout:
-  post:
-    summary: Invalidate session token (logout)
-    operationId: ownerLogout
-    responses:
-      "204":
-        description: Logged out
-
-/owner/delete:
-  post:
-    summary: Owner account delete (self-service)
-    operationId: ownerDelete
-    responses:
-      "204":
-        description: Account deleted
-
-/owner/rotate_keys:
-  post:
-    summary: Rotate (replace) public key and entropy
-    operationId: rotateKeys
-    requestBody:
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/RotateKeysRequest"
-    responses:
-      "200":
-        description: Keys rotated
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RotateKeysResponse"
-
-/owner/me:
-  get:
-    summary: Get reduced owner profile (no PII)
-    operationId: getOwnerMe
-    responses:
-      "200":
-        description: Reduced owner-ready profile
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/OwnerMeResponse"
+              $ref: "./schemas/schemas.yaml#/components/schemas/OwnerStorageWriteRequest"
+      responses:
+        "200":
+          description: Stored or retrieved encrypted private data storage
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/schemas.yaml#/components/schemas/APIResponseModel"
+    get:
+      summary: Retrieve encrypted private data storage
+      operationId: ownerStorageGet
+      security:
+        - SessionTokenAuth: []
+      responses:
+        "200":
+          description: Retrieved encrypted private data storage
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/schemas.yaml#/components/schemas/APIResponseModel"
 components:
-  schemas:
-    TagScanResponse:
-      type: object
-      properties:
-        tagId:
-          type: string
-          description: "The unique ID of the tag (reference, not directly linkable to user data)"
-        status:
-          type: string
-          enum: [unclaimed, claimed]
-          description: "'unclaimed' (no owner) or 'claimed' (owner exists)"
-        currentState:
-          type: string
-          enum: [not_lost, lost]
-          nullable: true
-          description: "Tag's current status; present only if 'claimed'."
-        description:
-          type: string
-          nullable: true
-          description: "Optional, privacy-friendly tag description (if set by owner)."
-        claimable:
-          type: boolean
-          description: "Whether the tag can be claimed after login. True when status is 'unclaimed'."
-        allowedActions:
-          type: array
-          items:
-            type: string
-            enum: [claim, contact, report]
-          description: "UI hints: what actions are currently available for the user."
-        infoText:
-          type: string
-          description: "User-facing explanation for current tag state, not containing any PI."
-      required:
-        - tagId
-        - status
-        - claimable
-        - allowedActions
-        - infoText
+  securitySchemes:
+    SessionTokenAuth:
+      type: apiKey
+      in: header
+      name: Session-Token
+      description: Session token for authentication (starts with 'sessiontok_')

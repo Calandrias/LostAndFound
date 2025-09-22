@@ -1,16 +1,18 @@
-from typing import Optional, Dict, Literal, Generic, TypeVar
+from typing import Optional, Dict, Literal, Annotated, Union
 from pydantic import Field
 
-from shared.com.identifier_model import StrictModel
+from shared.api.minimal_registry import generic_model
+from shared.com.identifier_model import StrictModel, NoData
+from shared.api.owner.api_owner_model import OwnerResponseModel
 
-T = TypeVar("T")
 
-
+@generic_model()
 class ErrorModel(StrictModel):
     code: str  # Machine-readable error code, e.g., "not_found", "forbidden"
     message: str  # Human-readable error message
 
 
+@generic_model()
 class ActionDetailModel(StrictModel):
     endpoint: str = Field(  # The API endpoint to perform this action
         ...,
@@ -29,16 +31,18 @@ class ActionDetailModel(StrictModel):
     # Extend with more properties as needed: labels, required params, UI hints, etc.
 
 
+@generic_model()
 class MetaModel(StrictModel):
     version: Optional[str] = None  # API or response schema version for migrations
     ttlSeconds: Optional[int] = None  # Data validity in seconds (TTL), if relevant
     requestId: Optional[str] = None  # Optional trace/debug field for server logs
 
 
-class APIResponseModel(Generic[T], StrictModel):
+@generic_model()
+class APIResponseModel(StrictModel):
     success: bool = Field(..., description="True on successful request (HTTP 2xx)")
     error: Optional[ErrorModel] = Field(None, description="Error object if success == False")
-    data: T  # data model will be refined in each domain
+    data: Annotated[Union[OwnerResponseModel, NoData], Field(discriminator="kind")]
     allowedActions: Dict[str, ActionDetailModel] = Field(
         default_factory=dict,
         description="Contains only allowed actions as keys. May be empty if no actions allowed.",
