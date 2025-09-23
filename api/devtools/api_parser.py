@@ -1,10 +1,11 @@
+""" API parser for OpenAPI and schema files. """
+
 import os
 import sys
-import json
-import yaml
 from copy import deepcopy
-from typing import Any, Dict, List, DefaultDict, Optional
+from typing import Any, Dict, List, DefaultDict
 from collections import defaultdict
+import yaml
 from prance import BaseParser, ValidationError
 from helper import Config, extract_schema_refs, validation_error_printer, dictify, update_refs, patch_const_to_enum
 
@@ -24,6 +25,8 @@ def combine_openapi(openapi_path: str, schemas_path: str, out_path: str = "opena
     combined.setdefault('components', {})['schemas'] = schemas['components']['schemas']
 
     update_refs(combined)
+    patch_const_to_enum(combined)
+    dictify(combined)
 
     with open(out_path, 'w', encoding='utf-8') as f:
         yaml.dump(combined, f, sort_keys=False, default_flow_style=False, allow_unicode=True)

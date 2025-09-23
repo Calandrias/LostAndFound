@@ -1,0 +1,28 @@
+from aws_cdk.aws_apigateway import RequestValidator
+
+{% for lambda in lambdas %}
+from infra.lambdas.{{ lambda.name }}_lambda import create_{{ lambda.name }}_lambda
+{% endfor %}
+
+def create_all_lambdas(scope, shared_layer, runtime_path, resources_bag, api, config):
+    # Create a request validator for the API Gateway    
+    validator = RequestValidator(
+        scope, "SessionTokenValidator",
+        rest_api=api,
+        validate_request_body=False,
+        validate_request_parameters=True
+    )
+    lambdas = {}
+    {% for lambda in lambdas %}
+    lambdas["{{ lambda.name }}"] = create_{{ lambda.name }}_lambda(
+        scope,
+        "{{ lambda.name|capitalize }}Function",
+        shared_layer,
+        runtime_path,
+        config['lambdas'][{{ loop.index0 }}].get('env', {}),
+        resources_bag,
+        api,
+        validator
+    )
+    {% endfor %}
+    return lambdas

@@ -16,6 +16,7 @@ class Config:
 
     @classmethod
     def load(cls, filename: str) -> 'Config':
+        """Load config from JSON5 file."""
         config_file = Path(__file__).parent / filename
         try:
             with open(config_file, 'r', encoding='utf-8') as f:
@@ -27,19 +28,28 @@ class Config:
             raise ValueError(f"Error loading configuration: {e}") from e
 
     def get_path(self, key: str) -> Path:
+        """Get Path by key from paths config."""
+
         path_str = self.paths.get(key)
         if not path_str:
             raise KeyError(f"Path '{key}' not found in config['paths']")
         return Path(path_str)
 
-    def get_lambda_config(self, tag_name: str) -> Optional[Dict[str, Any]]:
-        for entry in self.lambdas:
-            if entry.get('tag') == tag_name:
-                return entry
-        return None
+    def get_lambda_functions(self) -> List[Dict[str, Any]]:
+        """ Get List of all lambda functions from config """
+        return self.lambdas.get('functions', [])
 
-    def get_all_lambdas(self) -> List[Dict[str, Any]]:
-        return self.lambdas
+    def get_lambda_generic_config(self) -> Dict[str, Any]:
+        """Get generic config for lambda functions"""
+        return self.lambdas.get('generic', {})
+
+    def get_lambda_function_by_name(self, tag_name: str) -> Optional[Dict[str, Any]]:
+        """Get single lambda function by tag_name"""
+        all_funcs = self.get_lambda_functions() or {}
+        for func in all_funcs:
+            if func.get("tag_name") == tag_name:
+                return func.copy()
+        return None
 
     def get_modelsource(self, source_name: str) -> Optional[Dict[str, Any]]:
         return self.modelsources.get(source_name)

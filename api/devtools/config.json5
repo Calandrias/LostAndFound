@@ -10,11 +10,33 @@
     openapi_file: "api/openapi.yaml",
     temp_api_file: "api/temp.yaml"
   },
-  lambdas: [
+  lambdas:{
+    generic: {
+      memory_size: 128,
+      timeout: 3,
+      layers: ["shared_layer"],
+      runtime_path: "runtime/public",
+      lambda_target_path: "infra/lambdas",
+      request_parameters: {
+        "method.request.header.SessionToken": true
+      },
+    },
+    functions: [
     {
-      tag: "owner",
-      runtime_dir: "runtime/owner",
-      template: "owner_tag_abc.jinja2"
-    }
-  ]
+      tag_name: "owner",
+      handler: "owner.lambda_handler",
+      runtime_path: "runtime/owner",
+      env: {
+        OWNER_TABLE_NAME: "owner_table",
+        OWNER_SESSION_TABLE_NAME: "owner_session_table",
+      },
+      permissions: [
+        { table: "owner_table", access: "read_write" },
+        { table: "owner_session_table", access: "read_write" },
+      ],
+      description: "Owner onboarding Lambda",
+      tags: ["owner", "onboarding"],
+    },
+    ],
+}
 }

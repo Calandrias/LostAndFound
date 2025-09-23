@@ -1,0 +1,29 @@
+from aws_cdk.aws_lambda import Function, Runtime, Code, LayerVersion, Duration
+from aws_cdk.aws_apigateway import LambdaIntegration
+
+def create_{{ lambda.name }}_lambda(scope, id, shared_layer, resources_bag, api, validator):
+    env = lambda.env if hasattr(lambda, 'env') else {}
+    fn = Function(
+        scope,
+        id=id,
+        runtime=Runtime.{{ lambda.runtime or generic.runtime }},
+        code=Code.from_asset(str({{lambda.asset_path}}.joinpath("{{ lambda.name }}").resolve())),
+        handler="{{ lambda.handler }}",
+        environment=env,
+        layers=[shared_layer],
+        memory_size={{ lambda.memory_size or generic.memory_size }},
+        timeout=Duration.seconds({{ lambda.timeout or generic.timeout }}),
+    )
+    {% for perm in lambda.permissions %}
+    resources_bag.{{ perm.table }}.grant_{{ perm.access }}_data(fn)
+    {% endfor %}
+
+    owner_proxy = api.root.add_resource("owner").add_resource("{proxy+}")
+    {% for method in lambda.methods %}
+    owner_proxy.add_method("{{ method }}",
+        LambdaIntegration(fn),
+        request_validator=validator,
+        request_parameters={{lambda.request_parameters or generic.request_parameters}})
+    {% endfor %}
+    
+    return fn
