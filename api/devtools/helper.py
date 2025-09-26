@@ -1,8 +1,8 @@
 from pathlib import Path
 import json5
 import json
-from typing import Any, Dict, List, Optional
-from jinja2 import Environment, FileSystemLoader, StrictUndefined, UndefinedError, Template
+from typing import Any, Dict, List, Optional, Tuple
+from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template, meta
 
 
 class Config:
@@ -98,10 +98,15 @@ def patch_const_to_enum(schema: Any):
 def fix_nullable_fields_deep(schema: Any):
     """Recursively patch nullable fields to conform to OpenAPI."""
     if isinstance(schema, dict):
-        for key, value in schema.items():
+        for key in list(schema.keys()):
+            if key not in schema:
+                continue
+            value = schema[key]
             if key == "nullable" and value is True:
                 schema.clear()
-                schema["type"] = ["null"]
+                schema["type"] = "object"
+                schema["nullable"] = True
+                continue
             elif isinstance(value, (dict, list)):
                 fix_nullable_fields_deep(value)
     elif isinstance(schema, list):
@@ -193,10 +198,15 @@ def validation_error_printer(ve: Any) -> None:
     print(json.dumps(error_dict, indent=2, ensure_ascii=False))
 
 
-def load_jinja_template(template_name: str, template_dir: str) -> Template:
-    """Load a Jinja2 template from the given directory."""
+def load_jinja_template(template_name: str, template_dir: str) -> Tuple[Template, dict]:
+    """Load a Jinja2 template from the given directory and return Template + expected variables dict."""
     env = Environment(loader=FileSystemLoader(template_dir), undefined=StrictUndefined, autoescape=True)
-    return env.get_template(template_name)
+    template: Template = env.get_template(template_name)
+    template_source = env.loader.get_source(env, template_name)[0]
+    ast = env.parse(template_source)
+    variables = meta.find_undeclared_variables(ast)
+    expected_vars = {var: None for var in variables}
+    return template, expected_vars
 
 
 def render_jinja_template(template: Template, **kwargs) -> str:
@@ -204,18 +214,41 @@ def render_jinja_template(template: Template, **kwargs) -> str:
     return template.render(**kwargs)
 
 
-def list_required_variables(template: Template) -> List[str]:
-    """Return a list of all required variables for a Jinja2 template by rendering with dummy values."""
+def list_required_variables(template: Template, max_vars: int = 100) -> List[str]:
     dummy_vars: Dict[str, Any] = {}
     missing_vars: List[str] = []
+    count = 0
     while True:
+        count += 1
+        if count > max_vars:
+            print(f"Warnung: Abbruch nach {max_vars} Variablen. Mögliche Endlosschleife im Template '{template.name}'.")
+            break
         try:
             template.render(**dummy_vars)
             break  # All variables found
-        except UndefinedError as e:
+        except Exception as e:
+            print(f"[DEBUG] Exception: {e}")
             msg = str(e)
             var_name = msg.split("'")[1]
+            print(msg)
+            print(f"[DEBUG] Fehlende Variable: {var_name}")
             if var_name not in missing_vars:
                 missing_vars.append(var_name)
-            dummy_vars[var_name] = 'DUMMY'
+
+                # Fallback: try to extract variable name
+                var_name = msg.split("'")[1] if "'" in msg else msg
+
+                dummy_vars[var_name] = 'DUMMY'
+                print(f"[DEBUG] Setze Dummy-String für: {var_name}")
     return missing_vars
+
+
+def patch_schema_all(schema_dict: Any) -> Any:
+    """
+    Call all patch functions on the schema dict to ensure OpenAPI 3.x compatibility.
+    """
+    patch_const_to_enum(schema_dict)
+    update_refs(schema_dict)
+    fix_nullable_fields_deep(schema_dict)
+    patch_anyof_nullables(schema_dict)
+    return dictify(schema_dict)

@@ -7,7 +7,7 @@ from typing import Any, Dict, List, DefaultDict
 from collections import defaultdict
 import yaml
 from prance import BaseParser, ValidationError
-from helper import Config, extract_schema_refs, validation_error_printer, dictify, update_refs, patch_const_to_enum
+from helper import Config, extract_schema_refs, validation_error_printer, patch_schema_all
 
 
 def combine_openapi(openapi_path: str, schemas_path: str, out_path: str = "openapi_combined.yaml") -> Dict[str, Any]:
@@ -24,9 +24,7 @@ def combine_openapi(openapi_path: str, schemas_path: str, out_path: str = "opena
     combined = deepcopy(openapi)
     combined.setdefault('components', {})['schemas'] = schemas['components']['schemas']
 
-    update_refs(combined)
-    patch_const_to_enum(combined)
-    dictify(combined)
+    combined = patch_schema_all(combined)
 
     with open(out_path, 'w', encoding='utf-8') as f:
         yaml.dump(combined, f, sort_keys=False, default_flow_style=False, allow_unicode=True)
@@ -262,7 +260,7 @@ if __name__ == "__main__":
     print(f"📁 Combining {openapi_file} + {schemas_file}")
     combined_spec = combine_openapi(openapi_path=str(openapi_file), schemas_path=str(schemas_file), out_path=str(temp_file))
 
-    # Step 2: Pre-validation (NEW!)
+    # Step 2: Pre-validation
     validation_passed = detailed_validation_report(combined_spec)
 
     if not validation_passed:

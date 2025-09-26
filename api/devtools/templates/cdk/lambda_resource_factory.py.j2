@@ -1,11 +1,19 @@
 from aws_cdk.aws_lambda import Function, Runtime, Code, LayerVersion, Duration
-from aws_cdk.aws_apigateway import LambdaIntegration
+from aws_cdk.aws_apigatewayv2 import HttpApi, HttpMethod
+from aws_cdk.aws_apigatewayv2_integrations import HttpLambdaIntegration
+from typing import Any
 
-def create_{{ lambda.name }}_lambda(scope, id, shared_layer, resources_bag, api, validator):
+def create_all_lambdas(
+    scope: Any,
+    resources_bag: Any,
+) -> dict:
+    lambdas = {}
+    {% for lambda in lambdas %}
     env = lambda.env if hasattr(lambda, 'env') else {}
     fn = Function(
         scope,
-        id=id,
+        id="{{ lambda.name|capitalize }}Function",
+        function_name="{{ lambda.name|capitalize }}Function",
         runtime=Runtime.{{ lambda.runtime or generic.runtime }},
         code=Code.from_asset(str({{lambda.asset_path}}.joinpath("{{ lambda.name }}").resolve())),
         handler="{{ lambda.handler }}",
@@ -20,10 +28,12 @@ def create_{{ lambda.name }}_lambda(scope, id, shared_layer, resources_bag, api,
 
     owner_proxy = api.root.add_resource("owner").add_resource("{proxy+}")
     {% for method in lambda.methods %}
-    owner_proxy.add_method("{{ method }}",
-        LambdaIntegration(fn),
-        request_validator=validator,
-        request_parameters={{lambda.request_parameters or generic.request_parameters}})
+    http_api.add_routes(
+        path="{{ lambda.api_path }}",
+        methods=[HttpMethod.{{ method }}],
+        integration=HttpLambdaIntegration("{{ lambda.name }}{{ method }}Integration", fn)
+    )
     {% endfor %}
-    
-    return fn
+    lambdas["{{ lambda.name }}"] = fn
+    {% endfor %}
+    return lambdas

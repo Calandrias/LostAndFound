@@ -1,0 +1,17 @@
+# {{ tag_name }}_handler_ABC.py
+"""Auto-generated abstract base class for {{ tag_name }} tag handlers."""
+
+from abc import ABC, abstractmethod
+from typing import Any
+
+class {{ tag_name|capitalize }}HandlerABC(ABC):
+    """Abstract base class for {{ tag_name }} tag handlers."""
+    # Each method corresponds to an API endpoint defined in the OpenAPI spec.
+    # Decorators for Session Token handling and Method/Path validation adde based on API spec.
+    {% for endpoint in endpoints %}
+    @abstractmethod
+    def {{ endpoint.operationId }}(self, event, context, cache):
+        """{{ endpoint.summary }} ({{ endpoint.method }} {{ endpoint.path }})"""
+        # TODO: Implement logic for {{ endpoint.operationId }}
+        pass
+    {% endfor %}

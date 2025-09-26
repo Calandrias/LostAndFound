@@ -1,8 +1,8 @@
 # lambda_handler.py
 
-from {{ tag_name }}_handler_impl import {{ tag_name|capitalize }}Handler
+from Owner_handler_impl import OwnerHandler
 
-handler_instance = {{ tag_name|capitalize }}Handler()
+handler_instance = OwnerHandler()
 
 
 def _extract_method_path(event):
@@ -16,9 +16,15 @@ def _extract_method_path(event):
     return method, path
 
 routes = {
-{%- for endpoint in endpoints %}
-    ("{{ endpoint.method }}", "{{ endpoint.path }}"): handler_instance.{{ endpoint.operationId }}{% if not loop.last %},{% endif %}
-{%- endfor %}
+    ("POST", "/owner/onboarding"): handler_instance.ownerOnboarding,
+    ("POST", "/owner/login"): handler_instance.ownerLogin,
+    ("POST", "/owner/refresh"): handler_instance.ownerSessionRefresh,
+    ("POST", "/owner/logout"): handler_instance.ownerLogout,
+    ("GET", "/owner"): handler_instance.ownerGet,
+    ("DELETE", "/owner"): handler_instance.ownerDeleteAccount,
+    ("POST", "/owner/storage"): handler_instance.ownerStorage,
+    ("GET", "/owner/storage"): handler_instance.ownerStorageGet,
+    ("DELETE", "/owner/storage"): handler_instance.ownerStorageDelete
 }
 
 

@@ -6,7 +6,7 @@ import yaml
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from helper import Config, patch_const_to_enum, dictify, update_refs, fix_nullable_fields_deep, patch_anyof_nullables
+from helper import Config, patch_schema_all
 
 # --------- UTILS AND HELPERS ---------
 
@@ -214,19 +214,16 @@ if __name__ == "__main__":
     global_defs = OrderedDict()
     process_model_sources(combined_sources, global_defs)
 
-    print("\n🔧 Patching $ref and nullable fields...")
-    combined_schema = {"components": {"schemas": dictify(global_defs)}}
-    fix_nullable_fields_deep(combined_schema)
-    patch_anyof_nullables(combined_schema)
-    update_refs(combined_schema)
-    patch_const_to_enum(combined_schema)
+    print("\n🔧 Patching schema for OpenAPI 3.x and dictify....")
+
+    combined_schema = patch_schema_all({"components": {"schemas": global_defs}})
 
     print("\n📝 Writing output...")
     try:
         schema_file.parent.mkdir(parents=True, exist_ok=True)
         with open(schema_file, "w", encoding="UTF-8") as f:
             f.write("# This file is auto-generated from Pydantic models. Do not edit by hand!\n\n")
-            yaml.dump(dictify(combined_schema), f, sort_keys=False)
+            yaml.dump(combined_schema, f, sort_keys=False)
         print(f"✅ Generated schema: {schema_file}")
         print(f"📊 Total schemas: {len(global_defs)}")
     except Exception as e:

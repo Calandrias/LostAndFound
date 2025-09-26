@@ -8,9 +8,11 @@ servers:
 tags:
   - name: Owner
     description: End-user (owner) account management and authentication
+  - name: Tag
+    description: Operations about Tags
 
 paths:
-  /owner/onboarding:
+  /v1/owner/onboarding:
     post:
       tags:
         - Owner
@@ -43,7 +45,7 @@ paths:
               schema:
                 $ref: "./schemas/schemas.yaml#/components/schemas/APIResponseModel"
 
-  /owner/login:
+  /v1/owner/login:
     post:
       tags:
         - Owner
@@ -83,7 +85,7 @@ paths:
               schema:
                 $ref: "./schemas/schemas.yaml#/components/schemas/APIResponseModel"
 
-  /owner/refresh:
+  /v1/owner/refresh:
     post:
       tags:
         - Owner
@@ -107,7 +109,7 @@ paths:
               schema:
                 $ref: "./schemas/schemas.yaml#/components/schemas/APIResponseModel"
 
-  /owner/logout:
+  /v1/owner/logout:
     post:
       tags:
         - Owner
@@ -119,7 +121,7 @@ paths:
         "204":
           description: Logged out
 
-  /owner:
+  /v1/owner:
     get:
       tags:
         - Owner
@@ -158,7 +160,7 @@ paths:
         "204":
           description: Account deleted (no content)
 
-  /owner/storage:
+  /v1/owner/storage:
     post:
       tags:
         - Owner
@@ -216,6 +218,27 @@ paths:
                 $ref: "./schemas/schemas.yaml#/components/schemas/APIResponseModel"
         "204":
           description: Storage deleted (no content)
+
+  /tag/{tagId}:
+    get:
+      summary: Redirect to UI for tag
+      description: Redirects to the UI, passing the tagId as a query parameter.
+      parameters:
+        - name: tagId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to UI
+          headers:
+            Location:
+              description: Redirect target URL
+              schema:
+                type: string
+                example: "https://your-ui-url/ui?tag=exampleTagId"
+
 components:
   securitySchemes:
     SessionTokenAuth:

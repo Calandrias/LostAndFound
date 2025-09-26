@@ -23,7 +23,7 @@
     },
     functions: [
     {
-      tag_name: "owner",
+      tag_name: "Owner",
       handler: "owner.lambda_handler",
       runtime_path: "runtime/owner",
       env: {
@@ -38,5 +38,8 @@
       tags: ["owner", "onboarding"],
     },
     ],
+    redirects: {
+      tag_name: "tag",
+    }
 }
 }
