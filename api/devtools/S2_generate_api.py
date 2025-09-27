@@ -10,6 +10,46 @@ from prance import BaseParser, ValidationError
 from helper import Config, extract_schema_refs, validation_error_printer, patch_schema_all
 
 
+def sort_components(components):
+    """Sort schema components in a fixed order to ensure consistent output"""
+    component_order = ['schemas', 'responses', 'parameters', 'examples', 'requestBodies', 'headers', 'securitySchemes', 'links', 'callbacks']
+
+    sorted_components = {}
+    for key in component_order:
+        if key in components:
+            sorted_components[key] = dict(sorted(components[key].items()))
+
+    return sorted_components
+
+
+def sort_openapi_structure(openapi_data):
+    """Sort API following a common structure """
+
+    main_order = [
+        'openapi',
+        'info',
+        'servers',
+        'tags',
+        'paths',
+        'components',
+        'externalDocs',
+    ]
+
+    sorted_openapi = {}
+    for key in main_order:
+        if key in openapi_data:
+            sorted_openapi[key] = openapi_data[key]
+
+    for key, value in openapi_data.items():
+        if key not in sorted_openapi:
+            sorted_openapi[key] = value
+
+    if 'components' in sorted_openapi:
+        sorted_openapi['components'] = sort_components(sorted_openapi['components'])
+
+    return sorted_openapi
+
+
 def combine_openapi(openapi_path: str, schemas_path: str, out_path: str = "openapi_combined.yaml") -> Dict[str, Any]:
     """
     Combines OpenAPI YAML with external schemas into a self-contained file.
@@ -24,7 +64,7 @@ def combine_openapi(openapi_path: str, schemas_path: str, out_path: str = "opena
     combined = deepcopy(openapi)
     combined.setdefault('components', {})['schemas'] = schemas['components']['schemas']
 
-    combined = patch_schema_all(combined)
+    combined = sort_openapi_structure(patch_schema_all(combined))
 
     with open(out_path, 'w', encoding='utf-8') as f:
         yaml.dump(combined, f, sort_keys=False, default_flow_style=False, allow_unicode=True)
@@ -33,7 +73,7 @@ def combine_openapi(openapi_path: str, schemas_path: str, out_path: str = "opena
     return combined
 
 
-def validate_schema_references(combined_spec: Dict[str, Any]) -> Dict[str, Any]:
+def validate_schema_references(api_spec: Dict[str, Any]) -> Dict[str, Any]:
     """
     Pre-Prance validation: Check if all $ref references can be resolved.
     Returns detailed validation report.
@@ -42,8 +82,8 @@ def validate_schema_references(combined_spec: Dict[str, Any]) -> Dict[str, Any]:
 
     # Get all available schemas
     available_schemas = set()
-    if 'components' in combined_spec and 'schemas' in combined_spec['components']:
-        available_schemas = set(combined_spec['components']['schemas'].keys())
+    if 'components' in api_spec and 'schemas' in api_spec['components']:
+        available_schemas = set(api_spec['components']['schemas'].keys())
         print(f"📋 Available schemas ({len(available_schemas)}):")
         # Print in 4 columns
         schema_list = list(available_schemas)
@@ -76,8 +116,8 @@ def validate_schema_references(combined_spec: Dict[str, Any]) -> Dict[str, Any]:
                 check_refs_recursive(item, current_path)
 
     # Check all paths
-    if 'paths' in combined_spec:
-        for path_name, path_item in combined_spec['paths'].items():
+    if 'paths' in api_spec:
+        for path_name, path_item in api_spec['paths'].items():
             if not isinstance(path_item, dict):
                 validation_report['invalid_paths'].append(path_name)
                 validation_report['valid'] = False
@@ -86,13 +126,13 @@ def validate_schema_references(combined_spec: Dict[str, Any]) -> Dict[str, Any]:
             check_refs_recursive(path_item, f"paths.{path_name}")
 
     # Check components
-    if 'components' in combined_spec:
-        check_refs_recursive(combined_spec['components'], "components")
+    if 'components' in api_spec:
+        check_refs_recursive(api_spec['components'], "components")
 
     return validation_report
 
 
-def validate_request_response_schemas(combined_spec: Dict[str, Any]) -> Dict[str, Any]:
+def validate_request_response_schemas(api_spec: Dict[str, Any]) -> Dict[str, Any]:
     """
     Validate that requestBody and response schemas reference valid schemas.
     Focus on Lost & Found platform specific validation.
@@ -101,12 +141,12 @@ def validate_request_response_schemas(combined_spec: Dict[str, Any]) -> Dict[str
 
     # Get available schemas
     available_schemas = set()
-    if 'components' in combined_spec and 'schemas' in combined_spec['components']:
-        available_schemas = set(f"#/components/schemas/{name}" for name in combined_spec['components']['schemas'].keys())
+    if 'components' in api_spec and 'schemas' in api_spec['components']:
+        available_schemas = set(f"#/components/schemas/{name}" for name in api_spec['components']['schemas'].keys())
 
     # Check paths
-    if 'paths' in combined_spec:
-        for path_name, path_item in combined_spec['paths'].items():
+    if 'paths' in api_spec:
+        for path_name, path_item in api_spec['paths'].items():
             if not isinstance(path_item, dict):
                 continue
 
@@ -140,7 +180,7 @@ def validate_request_response_schemas(combined_spec: Dict[str, Any]) -> Dict[str
     return validation_report
 
 
-def detailed_validation_report(combined_spec: Dict[str, Any]) -> bool:
+def detailed_validation_report(validate_sepec: Dict[str, Any]) -> bool:
     """
     Comprehensive validation before sending to Prance.
     Returns True if validation passes, False otherwise.
@@ -150,7 +190,7 @@ def detailed_validation_report(combined_spec: Dict[str, Any]) -> bool:
 
     # 1. Schema Reference Validation
     print("📋 Checking schema references...")
-    ref_validation = validate_schema_references(combined_spec)
+    ref_validation = validate_schema_references(validate_sepec)
 
     if ref_validation['missing_refs']:
         print(f"❌ Found {len(ref_validation['missing_refs'])} missing schema references:")
@@ -164,7 +204,7 @@ def detailed_validation_report(combined_spec: Dict[str, Any]) -> bool:
 
     # 2. Request/Response Schema Validation
     print("\n🔧 Checking request/response schemas...")
-    req_res_validation = validate_request_response_schemas(combined_spec)
+    req_res_validation = validate_request_response_schemas(validate_sepec)
 
     if req_res_validation['issues']:
         print(f"❌ Found {len(req_res_validation['issues'])} request/response issues:")
@@ -186,7 +226,7 @@ def detailed_validation_report(combined_spec: Dict[str, Any]) -> bool:
 
     # Summary
     overall_valid = ref_validation['valid'] and req_res_validation['valid']
-    print(f"\n📊 Validation Summary:")
+    print("\n📊 Validation Summary:")
     print(f"  • Schema references: {'✅ PASS' if ref_validation['valid'] else '❌ FAIL'}")
     print(f"  • Request/Response schemas: {'✅ PASS' if req_res_validation['valid'] else '❌ FAIL'}")
     print(f"  • Overall: {'✅ READY FOR PRANCE' if overall_valid else '❌ NEEDS FIXING'}")

@@ -221,6 +221,8 @@ paths:
 
   /tag/{tagId}:
     get:
+      tags:
+        - Tag
       summary: Redirect to UI for tag
       description: Redirects to the UI, passing the tagId as a query parameter.
       parameters:

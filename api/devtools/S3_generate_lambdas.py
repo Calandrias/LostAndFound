@@ -1,13 +1,10 @@
-"""
-Generiert Lambda-Integrationscode und Handler für alle Tags aus der OpenAPI-Spec.
-Kann direkt aus dem Makefile aufgerufen werden.
-"""
-import sys
+"""Generate Lambdas from OpenAPI spec"""
+
 import json
 from pathlib import Path
 from typing import Dict, Any
-from api_parser import load_openapi_by_tag
-from helper import Config, load_jinja_template, render_jinja_template, list_required_variables
+from api.devtools.S2_generate_api import load_openapi_by_tag
+from helper import Config, load_jinja_template, render_jinja_template
 
 # Config und OpenAPI laden
 config = Config.load("config.json5")
@@ -28,14 +25,14 @@ def check_missing_parameters(expected, provided):
     return missing
 
 
-def process_template(template_name: str, template_dir: str, parameters: Dict[str, Any], output_path: Path, overwrite=True) -> bool:
+def process_template(template_name: str, template_dir: str, template_variables: Dict[str, Any], output_path: Path, overwrite=True) -> bool:
     template, expected_parameters = load_jinja_template(template_name, template_dir)
-    if check_missing_parameters(expected_parameters, parameters):
+    if check_missing_parameters(expected_parameters, template_variables):
         return False
     if output_path.exists() and not overwrite:
         print(f"File {output_path} already exists and overwrite is False. Skipping.")
         return True
-    code = render_jinja_template(template=template, **parameters)
+    code = render_jinja_template(template=template, **template_variables)
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(code)
     return True
@@ -51,9 +48,15 @@ tags = load_openapi_by_tag(str(openapi_file))
 
 for tag, endpoints in tags.items():
 
+    print(f"processing tag {tag}")
     #lambda runtime generation by tag
 
     config_for_tag = next((func for func in merged_lambda_functions if func.get("tag_name") == tag), None)
+
+    if not config_for_tag:
+        print("no config found for tag, skipping")
+        continue
+
     parameters = {
         "endpoints": endpoints,
         **config_for_tag,
@@ -63,7 +66,7 @@ for tag, endpoints in tags.items():
     process_template(
         template_name="handler_ABC.py.j2",
         template_dir="api/devtools/templates/runtime",
-        parameters=parameters,
+        template_variables=parameters,
         output_path=Path(config_for_tag.get("runtime_path")) / f"{tag}_ABC.py",
         overwrite=True,
     )
@@ -72,7 +75,7 @@ for tag, endpoints in tags.items():
     process_template(
         template_name="lambda_handler.py.j2",
         template_dir="api/devtools/templates/runtime",
-        parameters=parameters,
+        template_variables=parameters,
         output_path=Path(config_for_tag.get("runtime_path")) / f"{tag}_lambda_handler.py",
         overwrite=True,
     )
@@ -81,7 +84,7 @@ for tag, endpoints in tags.items():
     process_template(
         template_name="handler_impl.py.j2",
         template_dir="api/devtools/templates/runtime",
-        parameters=parameters,
+        template_variables=parameters,
         output_path=Path(config_for_tag.get("runtime_path")) / f"{tag}_handler_impl.py",
         overwrite=False,
     )

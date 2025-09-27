@@ -16,15 +16,15 @@ def _extract_method_path(event):
     return method, path
 
 routes = {
-    ("POST", "/owner/onboarding"): handler_instance.ownerOnboarding,
-    ("POST", "/owner/login"): handler_instance.ownerLogin,
-    ("POST", "/owner/refresh"): handler_instance.ownerSessionRefresh,
-    ("POST", "/owner/logout"): handler_instance.ownerLogout,
-    ("GET", "/owner"): handler_instance.ownerGet,
-    ("DELETE", "/owner"): handler_instance.ownerDeleteAccount,
-    ("POST", "/owner/storage"): handler_instance.ownerStorage,
-    ("GET", "/owner/storage"): handler_instance.ownerStorageGet,
-    ("DELETE", "/owner/storage"): handler_instance.ownerStorageDelete
+    ("DELETE", "/v1/owner"): handler_instance.ownerDeleteAccount,
+    ("GET", "/v1/owner"): handler_instance.ownerGet,
+    ("POST", "/v1/owner/login"): handler_instance.ownerLogin,
+    ("POST", "/v1/owner/logout"): handler_instance.ownerLogout,
+    ("POST", "/v1/owner/onboarding"): handler_instance.ownerOnboarding,
+    ("POST", "/v1/owner/refresh"): handler_instance.ownerSessionRefresh,
+    ("DELETE", "/v1/owner/storage"): handler_instance.ownerStorageDelete,
+    ("GET", "/v1/owner/storage"): handler_instance.ownerStorageGet,
+    ("POST", "/v1/owner/storage"): handler_instance.ownerStorage
 }
 
 

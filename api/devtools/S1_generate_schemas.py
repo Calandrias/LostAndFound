@@ -53,14 +53,14 @@ def safe_import(modulename: str, classname: str) -> Optional[Any]:
 
 def get_models_from_registry() -> Dict[str, Any]:
     try:
-        from shared.api import minimal_registry as registry
+        from shared.api import minimal_registry as registry  # pylint disable=import-outside-toplevel # lazy import to reduce overhead
         return registry.get_registered_models()
     except ImportError:
         print("Warning: No registry found, scanning will not discover decorated models")
         return {}
 
 
-def validate_models(model_sources: Dict[str, Any]) -> bool:
+def validate_models(validation_models: Dict[str, Any]) -> bool:
     """Validate Pydantic models and discriminators for response/request models."""
     validation_issues = []
     valid_models = []
@@ -75,7 +75,7 @@ def validate_models(model_sources: Dict[str, Any]) -> bool:
         response_registry = {}
         request_registry = {}
 
-    for model_name, import_path in model_sources.items():
+    for model_name, import_path in validation_models.items():
         if isinstance(import_path, dict):
             model_class = import_path.get('class')
             if model_class is None:

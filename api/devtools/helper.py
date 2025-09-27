@@ -202,45 +202,18 @@ def load_jinja_template(template_name: str, template_dir: str) -> Tuple[Template
     """Load a Jinja2 template from the given directory and return Template + expected variables dict."""
     env = Environment(loader=FileSystemLoader(template_dir), undefined=StrictUndefined, autoescape=True)
     template: Template = env.get_template(template_name)
-    template_source = env.loader.get_source(env, template_name)[0]
-    ast = env.parse(template_source)
-    variables = meta.find_undeclared_variables(ast)
-    expected_vars = {var: None for var in variables}
+    expected_vars = {}
+    if env.loader:
+        template_source = env.loader.get_source(env, template_name)[0]
+        ast = env.parse(template_source)
+        variables = meta.find_undeclared_variables(ast)
+        expected_vars = {var: None for var in variables}
     return template, expected_vars
 
 
 def render_jinja_template(template: Template, **kwargs) -> str:
     """Render a Jinja2 template with the provided variables."""
     return template.render(**kwargs)
-
-
-def list_required_variables(template: Template, max_vars: int = 100) -> List[str]:
-    dummy_vars: Dict[str, Any] = {}
-    missing_vars: List[str] = []
-    count = 0
-    while True:
-        count += 1
-        if count > max_vars:
-            print(f"Warnung: Abbruch nach {max_vars} Variablen. Mögliche Endlosschleife im Template '{template.name}'.")
-            break
-        try:
-            template.render(**dummy_vars)
-            break  # All variables found
-        except Exception as e:
-            print(f"[DEBUG] Exception: {e}")
-            msg = str(e)
-            var_name = msg.split("'")[1]
-            print(msg)
-            print(f"[DEBUG] Fehlende Variable: {var_name}")
-            if var_name not in missing_vars:
-                missing_vars.append(var_name)
-
-                # Fallback: try to extract variable name
-                var_name = msg.split("'")[1] if "'" in msg else msg
-
-                dummy_vars[var_name] = 'DUMMY'
-                print(f"[DEBUG] Setze Dummy-String für: {var_name}")
-    return missing_vars
 
 
 def patch_schema_all(schema_dict: Any) -> Any:

@@ -74,7 +74,7 @@ class SessionHelperBase:
                 item = dynamodb_decimal_to_int(item)
                 for field, field_info in model.model_fields.items():
                     field_type = field_info.annotation
-                    if field in item and hasattr(field_type, 'model_fields') and hasattr(field_type, 'validate'):
+                    if field in item and hasattr(field_type, 'model_fields') and hasattr(field_type, 'validate') and field_type:
                         item[field] = field_type(value=item[field])
             return model.model_validate(item) if item else None
         except (ClientError, ValidationError) as e:

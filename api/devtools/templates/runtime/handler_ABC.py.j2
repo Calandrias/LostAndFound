@@ -8,10 +8,10 @@ class {{ tag_name|capitalize }}HandlerABC(ABC):
     """Abstract base class for {{ tag_name }} tag handlers."""
     # Each method corresponds to an API endpoint defined in the OpenAPI spec.
     # Decorators for Session Token handling and Method/Path validation adde based on API spec.
-    {% for endpoint in endpoints %}
+    {%- for endpoint in endpoints %}
     @abstractmethod
     def {{ endpoint.operationId }}(self, event, context, cache):
         """{{ endpoint.summary }} ({{ endpoint.method }} {{ endpoint.path }})"""
         # TODO: Implement logic for {{ endpoint.operationId }}
         pass
-    {% endfor %}
+    {%- endfor %}
