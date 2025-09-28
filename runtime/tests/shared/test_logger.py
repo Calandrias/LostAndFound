@@ -1,11 +1,11 @@
 """Tests for logging utilities with identifier prefix masking, strict loglevel policy and memory handler for output capturing."""
 
 import logging
-import pytest
 import random
 import io
+import pytest
 
-from runtime.shared.com.logging_utils import ProjectLogger, SanitizingFormatter
+from shared.com.logging_utils import ProjectLogger, SanitizingFormatter
 
 
 def random_logger() -> str:
@@ -101,16 +101,16 @@ def test_logger_sanitizer_on_args_with_prefixes():
 
 def test_logger_singleton_and_handler():
     logger_name = random_logger()
-    loggerA = ProjectLogger(logger_name).get_logger()
-    loggerB = ProjectLogger(logger_name).get_logger()
-    assert loggerA is loggerB
-    loggerA.handlers.clear()
-    loggerC = ProjectLogger(logger_name).get_logger()
-    streamC = attach_memory_handler(loggerC)
-    loggerC.info("should show after clearing handlers: tag_ABCDEFGHJKLMNOPQRSTU")
-    outC = streamC.getvalue()
-    assert "should show after clearing handlers" in outC
-    assert ">len=" in outC
+    logger_a = ProjectLogger(logger_name).get_logger()
+    logger_b = ProjectLogger(logger_name).get_logger()
+    assert logger_a is logger_b
+    logger_a.handlers.clear()
+    logger_c = ProjectLogger(logger_name).get_logger()
+    stream_c = attach_memory_handler(logger_c)
+    logger_c.info("should show after clearing handlers: tag_ABCDEFGHJKLMNOPQRSTU")
+    out_c = stream_c.getvalue()
+    assert "should show after clearing handlers" in out_c
+    assert ">len=" in out_c
 
 
 def test_formatter_custom_pattern_for_qr_prefix():

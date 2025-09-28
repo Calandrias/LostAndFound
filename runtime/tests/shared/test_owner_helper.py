@@ -1,8 +1,7 @@
 import pytest
 
-from runtime.shared.com.identifier_model import OwnerHash, Timestamp, PublicKey
-from runtime.shared.db.owner.owner_model import PasswordHash
-from runtime.shared.db.owner.owner_store import OwnerHelper
+from shared.db.owner.owner_model import State
+from shared.db.owner.owner_store import OwnerHelper
 
 
 @pytest.fixture
@@ -59,7 +58,7 @@ def test_validate_field_real_owner(valid_owner_values):
 
 def test_validate_field_state_enum():
     """The enum itself is accepted, not just its string value."""
-    from runtime.shared.db.owner.owner_model import State
+
     for s in State:
         assert OwnerHelper.validate_field("state", s.value) is True
 

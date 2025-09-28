@@ -1,7 +1,7 @@
 from typing import Literal, Annotated, Union
 from pydantic import Field, StrictStr
 
-from shared.api.minimal_registry import owner_model
+from shared.minimal_registry import owner_model
 from shared.com.identifier_model import StrictModel, OwnerHash, Timestamp, PublicKey, NoData
 from shared.db.owner.owner_model import PasswordHash
 

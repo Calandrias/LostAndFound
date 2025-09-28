@@ -1,7 +1,7 @@
 from typing import Optional, Dict, Literal, Annotated, Union
 from pydantic import Field
 
-from shared.api.minimal_registry import generic_model
+from shared.minimal_registry import generic_model
 from shared.com.identifier_model import StrictModel, NoData
 from shared.api.owner.api_owner_model import OwnerResponseModel
 
@@ -16,20 +16,11 @@ class ErrorModel(StrictModel):
 @generic_model()
 class ActionDetailModel(StrictModel):
     """Details about allowed actions for the client after a response."""
-    endpoint: str = Field(
-        ...,
-        pattern=r"^/[^/h].*",
-        description="API endpoint starting with / and not allowing external links."
-    )
+    endpoint: str = Field(..., pattern=r"^/[^/h].*", description="API endpoint starting with / and not allowing external links.")
     method: Literal["GET", "POST", "PUT", "DELETE", "PATCH"] = Field(..., description="HTTP method for the action.")
     rateLimit: Optional[int] = Field(None, description="Number of allowed attempts, if rate limited.")
     rateWindow: Optional[str] = Field(None, description="Rate window, e.g. '60s'.")
-    description: str = Field(
-        min_length=0,
-        max_length=4096,
-        pattern=r'^[A-Za-z0-9+/= ]+\n?$',
-        description="Action description to be used in UI."
-    )
+    description: str = Field(min_length=0, max_length=4096, pattern=r'^[A-Za-z0-9+/= ]+\n?$', description="Action description to be used in UI.")
     # Extend with more properties as needed: labels, required params, UI hints, etc.
 
 
@@ -50,8 +41,5 @@ class APIResponseModel(StrictModel):
     success: bool = Field(..., description="True on successful request (HTTP 2xx).")
     error: Optional[ErrorModel] = Field(None, description="Error object if success == False.")
     data: Annotated[Union[OwnerResponseModel, NoData], Field(discriminator="kind", description="Response data, discriminated by 'kind'.")]
-    allowedActions: Dict[str, ActionDetailModel] = Field(
-        default_factory=dict,
-        description="Contains only allowed actions as keys. May be empty if no actions allowed."
-    )
+    allowedActions: Dict[str, ActionDetailModel] = Field(default_factory=dict, description="Contains only allowed actions as keys. May be empty if no actions allowed.")
     meta: Optional[MetaModel] = Field(None, description="Optional metadata for the response.")

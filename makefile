@@ -1,6 +1,10 @@
 # Simple Makefile for Lost & Found QR Platform
 
-PYTHON := python3
+PYTHON := poetry run python3
+SHARED_SRC := $(PWD)/runtime/shared/src
+export PYTHONPATH := $(SHARED_SRC):$(PYTHONPATH)
+
+
 
 .PHONY: all lint test clean generate-schemas generate-api generate-lambdas generate help
 
@@ -53,3 +57,4 @@ install:
 ## Make Layer from runtime/shared "editable"
 editable:
 	poetry run pip install -e runtime/shared
+

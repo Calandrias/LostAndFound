@@ -4,7 +4,7 @@
     //APIResponseModel: "shared.api.response_model:APIResponseModel",
   },
   paths: {
-    input_dir: "runtime/shared",
+    input_dir: "runtime/shared", //pydantic models
     output_dir: "api/generated",
     schema_file: "api/schemas/schemas.yaml",
     openapi_file: "api/openapi.yaml",

@@ -1,15 +1,15 @@
+"""Generate openai schemas out of decorated pydantic models"""
+import sys
+from pathlib import Path
 from importlib import import_module
 import importlib.util
 from collections import OrderedDict
+from typing import Any, Dict, List, Optional
 from pydantic import TypeAdapter, BaseModel
 import yaml
-import sys
-from pathlib import Path
-from typing import Any, Dict, List, Optional
 from helper import Config, patch_schema_all
 
-
-from shared.api import minimal_registry as registry
+from shared import minimal_registry as registry
 
 # --------- UTILS AND HELPERS ---------
 
@@ -55,6 +55,7 @@ def safe_import(modulename: str, classname: str) -> Optional[Any]:
 
 
 def get_models_from_registry() -> Dict[str, Any]:
+    """ """
     try:
         return registry.get_registered_models()
     except ImportError:
@@ -136,6 +137,7 @@ def validate_models(validation_models: Dict[str, Any]) -> bool:
 
 def process_model_sources(model_sources: Dict[str, Any], global_defs: OrderedDict):
     """Process models for schema extraction, collect all $defs and merge conflicts."""
+
     processed_models = []
     for model_name, import_path in model_sources.items():
         if isinstance(import_path, dict):

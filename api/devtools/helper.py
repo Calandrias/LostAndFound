@@ -1,7 +1,8 @@
 from pathlib import Path
-import json5
 import json
 from typing import Any, Dict, List, Optional, Tuple
+from collections import OrderedDict
+import json5
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template, meta
 
 
@@ -101,13 +102,16 @@ def fix_nullable_fields_deep(schema: Any):
         for key in list(schema.keys()):
             if key not in schema:
                 continue
+
             value = schema[key]
+
             if key == "nullable" and value is True:
                 schema.clear()
                 schema["type"] = "object"
                 schema["nullable"] = True
                 continue
-            elif isinstance(value, (dict, list)):
+
+            if isinstance(value, (dict, list)):
                 fix_nullable_fields_deep(value)
     elif isinstance(schema, list):
         for item in schema:
@@ -141,7 +145,7 @@ def patch_anyof_nullables(schema: Any) -> None:
 
 def dictify(obj: Any) -> Any:
     """Recursively convert OrderedDict/list to dict/list."""
-    from collections import OrderedDict
+
     if isinstance(obj, OrderedDict):
         return {k: dictify(v) for k, v in sorted(obj.items())}
     if isinstance(obj, dict):
@@ -167,7 +171,7 @@ def extract_schema_refs(obj: Any, context: str = "") -> List[str]:
                 if "discriminator" in obj["schema"]:
                     discriminator = obj["schema"]["discriminator"]
                     if "mapping" in discriminator:
-                        for disc_key, disc_ref in discriminator["mapping"].items():
+                        for _, disc_ref in discriminator["mapping"].items():
                             refs.append(disc_ref)
         for key, value in obj.items():
             refs.extend(extract_schema_refs(value, f"{context}.{key}"))

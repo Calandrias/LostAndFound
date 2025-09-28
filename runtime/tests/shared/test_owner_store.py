@@ -3,10 +3,8 @@ import logging
 from moto import mock_aws
 import boto3
 
-from pydantic import ValidationError
-
-from runtime.shared.db.owner.owner_model import State
-from runtime.shared.db.owner.owner_store import OwnerStore, OwnerHelper
+from shared.db.owner.owner_model import State
+from shared.db.owner.owner_store import OwnerStore, OwnerHelper
 
 OWNER_TABLE = "LostAndFound-Owner"
 
