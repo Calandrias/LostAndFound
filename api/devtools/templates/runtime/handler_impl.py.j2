@@ -1,12 +1,15 @@
-# {{ tag_name }}_handler_impl.py
+# {{ tag_name | lower }}_handler_impl.py
 """Handler implementation for the '{{ tag_name }}' tag."""
 
 from {{ tag_name }}_ABC import {{ tag_name|capitalize }}HandlerABC
 
+# pylint: disable=fixme # prototype file for implementation
 class {{ tag_name|capitalize }}Handler({{ tag_name|capitalize }}HandlerABC):
     # TODO: Implement logic for each method defined in the ABC class.
-    {% for endpoint in endpoints %}
-    def {{ endpoint.operationId }}(self, event, context, cache):
+    {%- for endpoint in endpoints %}
+
+    def {{ endpoint.operationId | snake_case }}(self, event, context, cache):
         """{{ endpoint.summary }} ({{ endpoint.method }} {{ endpoint.path }})"""
-        # TODO: Implement logic for {{ endpoint.operationId }}
-    {% endfor %}
+        # TODO: Implement logic for {{ endpoint.operationId | snake_case }}
+    {%- endfor %}
+{{ '\n' -}}

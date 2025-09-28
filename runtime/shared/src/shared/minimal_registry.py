@@ -1,9 +1,7 @@
-"""
-Minimal Zero-Overhead Model Registry 
-"""
-_REGISTERED_MODELS = {}
-
+""" Minimal Zero-Overhead Model Registry"""
 from typing import Union
+
+_REGISTERED_MODELS = {}
 
 
 def api_model(cls=None, *, name=None, tags=None, req_res=None, discriminator_field=None):

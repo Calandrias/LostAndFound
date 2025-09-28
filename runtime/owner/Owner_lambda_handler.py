@@ -1,4 +1,5 @@
-# lambda_handler.py
+# owner_lambda_handler.py
+"""Auto-generated Lmabda Hander for for Owner"""
 
 from Owner_handler_impl import OwnerHandler
 
@@ -16,15 +17,15 @@ def _extract_method_path(event):
     return method, path
 
 routes = {
-    ("DELETE", "/v1/owner"): handler_instance.ownerDeleteAccount,
-    ("GET", "/v1/owner"): handler_instance.ownerGet,
-    ("POST", "/v1/owner/login"): handler_instance.ownerLogin,
-    ("POST", "/v1/owner/logout"): handler_instance.ownerLogout,
-    ("POST", "/v1/owner/onboarding"): handler_instance.ownerOnboarding,
-    ("POST", "/v1/owner/refresh"): handler_instance.ownerSessionRefresh,
-    ("DELETE", "/v1/owner/storage"): handler_instance.ownerStorageDelete,
-    ("GET", "/v1/owner/storage"): handler_instance.ownerStorageGet,
-    ("POST", "/v1/owner/storage"): handler_instance.ownerStorage
+    ("DELETE", "/v1/owner"): handler_instance.owner_delete_account,
+    ("GET", "/v1/owner"): handler_instance.owner_get,
+    ("POST", "/v1/owner/login"): handler_instance.owner_login,
+    ("POST", "/v1/owner/logout"): handler_instance.owner_logout,
+    ("POST", "/v1/owner/onboarding"): handler_instance.owner_onboarding,
+    ("POST", "/v1/owner/refresh"): handler_instance.owner_session_refresh,
+    ("DELETE", "/v1/owner/storage"): handler_instance.owner_storage_delete,
+    ("GET", "/v1/owner/storage"): handler_instance.owner_storage_get,
+    ("POST", "/v1/owner/storage"): handler_instance.owner_storage
 }
 
 
@@ -37,12 +38,6 @@ def lambda_handler(event, context):
     route = routes.get((method, path))
     if route is None:
         return {"statusCode": 404, "body": "Endpoint not found"}
-    if method == "GET":
-        cached = _cache_get(key)
-    if cached is not None:
-        return cached
-    
-    response = route(event, context, cache)
-    if method == "GET" and isinstance(response, dict) and response.get("statusCode") == 200:
-        _cache_put(key, response)
+  
     return response
+

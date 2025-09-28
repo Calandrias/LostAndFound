@@ -15,7 +15,6 @@ output_dir.mkdir(exist_ok=True)
 generic_config = config.get_lambda_generic_config()
 lambda_functions = config.get_lambda_functions()
 
-
 def check_missing_parameters(expected, provided):
     print(f"Expected parameters: {json.dumps(expected, indent=2)}")
     print(f"Provided parameters: {json.dumps(provided, indent=2)}")

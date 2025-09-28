@@ -1,3 +1,4 @@
+"""Definition of Request and Response models for Owner interactions"""
 from typing import Literal, Annotated, Union
 from pydantic import Field, StrictStr
 

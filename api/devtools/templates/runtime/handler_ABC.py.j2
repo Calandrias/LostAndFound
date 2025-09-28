@@ -1,17 +1,19 @@
-# {{ tag_name }}_handler_ABC.py
+# {{ tag_name | lower }}_handler_abc.py
 """Auto-generated abstract base class for {{ tag_name }} tag handlers."""
 
 from abc import ABC, abstractmethod
-from typing import Any
 
+# pylint: disable=unnecessary-pass # pass is okay for abstract class
 class {{ tag_name|capitalize }}HandlerABC(ABC):
     """Abstract base class for {{ tag_name }} tag handlers."""
     # Each method corresponds to an API endpoint defined in the OpenAPI spec.
     # Decorators for Session Token handling and Method/Path validation adde based on API spec.
     {%- for endpoint in endpoints %}
+
     @abstractmethod
-    def {{ endpoint.operationId }}(self, event, context, cache):
+    def {{ endpoint.operationId | snake_case }}(self, event, context, cache):
         """{{ endpoint.summary }} ({{ endpoint.method }} {{ endpoint.path }})"""
-        # TODO: Implement logic for {{ endpoint.operationId }}
+        # Implement logic for {{ endpoint.operationId | snake_case }} in derived class
         pass
     {%- endfor %}
+{{ '\n' -}}

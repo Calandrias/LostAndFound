@@ -1,7 +1,7 @@
 from pydantic import Field, BaseModel, ConfigDict, StrictStr, StrictInt
 from typing import ClassVar, Literal
 
-from shared.api.minimal_registry import generic_model, owner_model
+from shared.minimal_registry import generic_model, owner_model
 
 
 class StrictModel(BaseModel):

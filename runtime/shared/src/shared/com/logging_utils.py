@@ -1,5 +1,4 @@
 import os
-import sys
 import logging
 import re
 
@@ -18,8 +17,7 @@ def mask_sensitive_patterns(text: str) -> str:
                 if len(suffix) > 3:
                     masked_suffix = f"{suffix[0]}>len={len(suffix)}<{suffix[-1]}"
                     return prefix + masked_suffix
-                else:
-                    return word
+                return word
         if len(word) < 4:
             return word
         return f"{word[0]}>len={len(word)}<{word[-1]}"

@@ -36,8 +36,10 @@ def scan_directory_for_models(directory: str, recursive: bool = True) -> List[Pa
                     module = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(module)
                     imported_modules.append(py_file.relative_to(base_path))
-            except Exception as e:
-                print(f"Warning: Could not import {py_file.name}: {e}")
+            except (ImportError, FileNotFoundError, AttributeError, SyntaxError) as e:
+                print(f"Warning: Could not import {py_file.name}: {type(e).__name__}: {e}")
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                print(f"Unexpected error while importing {py_file.name}: {type(e).__name__}: {e}")
     finally:
         sys.path = original_path
     return imported_modules
@@ -49,13 +51,13 @@ def safe_import(modulename: str, classname: str) -> Optional[Any]:
         module = import_module(modulename)
         model_class = getattr(module, classname)
         return model_class
-    except Exception as e:
-        print(f"Error importing {modulename}:{classname} -> {e}")
+    except (ImportError, AttributeError, ModuleNotFoundError) as e:
+        print(f"Error importing {modulename}:{classname} -> {type(e).__name__}: {e}")
         return None
 
 
 def get_models_from_registry() -> Dict[str, Any]:
-    """ """
+    """Get decorated models from model registry """
     try:
         return registry.get_registered_models()
     except ImportError:
@@ -73,9 +75,12 @@ def validate_models(validation_models: Dict[str, Any]) -> bool:
     # Try to get union response/request models if registry provides them
     try:
         response_registry = getattr(registry, 'get_response_models', lambda: {})()
-        request_registry = getattr(registry, 'get_request_models', lambda: {})()
-    except Exception:
+    except (AttributeError, TypeError):
         response_registry = {}
+
+    try:
+        request_registry = getattr(registry, 'get_request_models', lambda: {})()
+    except (AttributeError, TypeError):
         request_registry = {}
 
     for model_name, import_path in validation_models.items():
@@ -91,19 +96,27 @@ def validate_models(validation_models: Dict[str, Any]) -> bool:
                 if model_class is None:
                     validation_issues.append(f"Could not import {model_name}")
                     continue
-            except Exception:
-                validation_issues.append(f"Invalid import path for {model_name}")
+
+            except ValueError:
+                validation_issues.append(f"Invalid import path for {model_name} (malformed)")
+                continue
+            except ImportError as e:
+                validation_issues.append(f"Could not import {model_name}: {e}")
+                continue
+            except AttributeError as e:
+                validation_issues.append(f"Could not import {model_name}: {e}")
                 continue
         # Schema generation check
         try:
             if isinstance(model_class, type) and issubclass(model_class, BaseModel):
-                schema = model_class.model_json_schema()
+                model_class.model_json_schema()
             else:
-                schema = TypeAdapter(model_class).json_schema()
+                TypeAdapter(model_class).json_schema()
             valid_models.append(model_name)
-        except Exception as e:
-            validation_issues.append(f"Schema generation failed for {model_name}: {e}")
+        except (TypeError, AttributeError, ValueError) as e:
+            validation_issues.append(f"Schema generation failed for {model_name}: {type(e).__name__}: {e}")
             continue
+
         # Response model "kind" discriminator check
         if model_name in response_registry:
             response_models.append(model_name)
@@ -179,7 +192,7 @@ def process_model_sources(model_sources: Dict[str, Any], global_defs: OrderedDic
 # --------- MAIN SCRIPT ---------
 
 if __name__ == "__main__":
-    print(f"🚀 Schema Generator for Lost & Found Platform")
+    print("🚀 Schema Generator for Lost & Found Platform")
     print("=" * 60)
 
     config = Config.load("config.json5")

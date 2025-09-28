@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import re
 from typing import Any, Dict, List, Optional, Tuple
 from collections import OrderedDict
 import json5
@@ -158,26 +159,28 @@ def dictify(obj: Any) -> Any:
 def extract_schema_refs(obj: Any, context: str = "") -> List[str]:
     """Extract all $ref references from request/response objects recursively."""
     refs: List[str] = []
+
     if isinstance(obj, dict):
         if "$ref" in obj:
             refs.append(obj["$ref"])
-        elif "schema" in obj:
-            if isinstance(obj["schema"], dict) and "$ref" in obj["schema"]:
-                refs.append(obj["schema"]["$ref"])
-            elif isinstance(obj["schema"], dict) and "oneOf" in obj["schema"]:
-                for one_of_item in obj["schema"]["oneOf"]:
-                    if isinstance(one_of_item, dict) and "$ref" in one_of_item:
-                        refs.append(one_of_item["$ref"])
-                if "discriminator" in obj["schema"]:
-                    discriminator = obj["schema"]["discriminator"]
-                    if "mapping" in discriminator:
-                        for _, disc_ref in discriminator["mapping"].items():
-                            refs.append(disc_ref)
+        schema = obj.get("schema")
+        if isinstance(schema, dict):
+            if "$ref" in schema:
+                refs.append(schema["$ref"])
+            for one_of_item in schema.get("oneOf", []):
+                if isinstance(one_of_item, dict) and "$ref" in one_of_item:
+                    refs.append(one_of_item["$ref"])
+            discriminator = schema.get("discriminator", {})
+            for disc_ref in discriminator.get("mapping", {}).values():
+                refs.append(disc_ref)
+
         for key, value in obj.items():
             refs.extend(extract_schema_refs(value, f"{context}.{key}"))
+
     elif isinstance(obj, list):
         for i, item in enumerate(obj):
             refs.extend(extract_schema_refs(item, f"{context}[{i}]"))
+
     return refs
 
 
@@ -202,9 +205,14 @@ def validation_error_printer(ve: Any) -> None:
     print(json.dumps(error_dict, indent=2, ensure_ascii=False))
 
 
+def to_snake_case(value):
+    return re.sub(r'(?<!^)(?=[A-Z])', '_', value).lower()
+
+
 def load_jinja_template(template_name: str, template_dir: str) -> Tuple[Template, dict]:
     """Load a Jinja2 template from the given directory and return Template + expected variables dict."""
     env = Environment(loader=FileSystemLoader(template_dir), undefined=StrictUndefined, autoescape=True)
+    env.filters['snake_case'] = to_snake_case
     template: Template = env.get_template(template_name)
     expected_vars = {}
     if env.loader:

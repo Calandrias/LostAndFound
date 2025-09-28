@@ -15,6 +15,7 @@ class State(str, Enum):
 
 
 class PasswordHash(StrictModel):
+    """Pydantic model representing an Password Hash  with validation."""
     pattern: ClassVar[str] = r'^\$2[aby]\$[0-9]{2}\$[A-Za-z0-9./]{53}$'
     min_length: ClassVar[int] = 60
     max_length: ClassVar[int] = 60
@@ -27,6 +28,7 @@ class PasswordHash(StrictModel):
         max_length=max_length,
         description=description,
     )
+
 
 class Owner(StrictModel):
     """Pydantic model representing an Owner with validation."""
@@ -55,7 +57,7 @@ class Owner(StrictModel):
         pattern=r'^[A-Za-z0-9+/=]+\n?$',
         description="Base64-encoded encrypted storage for owner's private data",
     )
-    
+
     state: State = Field(default=State.ONBOARDING, description="Owner account state flag: active, blocked, ongoing onboarding or pending deletion")
 
     ALLOWED_UPDATE_FIELDS: ClassVar[Set[str]] = {"state", "random_entropy", "public_key", "password_hash"}

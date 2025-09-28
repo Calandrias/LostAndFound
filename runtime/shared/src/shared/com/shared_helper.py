@@ -2,8 +2,8 @@
 
 import json
 import pathlib
-from pydantic import BaseModel
 from datetime import datetime, timezone
+from pydantic import BaseModel
 
 
 def dynamodb_decimal_to_int(obj: dict) -> dict:

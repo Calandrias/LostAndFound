@@ -1,55 +1,65 @@
-# Owner_handler_ABC.py
+# owner_handler_abc.py
 """Auto-generated abstract base class for Owner tag handlers."""
 
 from abc import ABC, abstractmethod
-from typing import Any
 
+# pylint: disable=unnecessary-pass # pass is okay for abstract class
 class OwnerHandlerABC(ABC):
     """Abstract base class for Owner tag handlers."""
     # Each method corresponds to an API endpoint defined in the OpenAPI spec.
     # Decorators for Session Token handling and Method/Path validation adde based on API spec.
+
     @abstractmethod
-    def ownerDeleteAccount(self, event, context, cache):
+    def owner_delete_account(self, event, context, cache):
         """Delete owner account (challenge/confirm) (DELETE /v1/owner)"""
-        # TODO: Implement logic for ownerDeleteAccount
+        # Implement logic for owner_delete_account in derived class
         pass
+
     @abstractmethod
-    def ownerGet(self, event, context, cache):
+    def owner_get(self, event, context, cache):
         """Get owner account info/status (GET /v1/owner)"""
-        # TODO: Implement logic for ownerGet
+        # Implement logic for owner_get in derived class
         pass
+
     @abstractmethod
-    def ownerLogin(self, event, context, cache):
+    def owner_login(self, event, context, cache):
         """Owner Auth (Challenge/Response) (POST /v1/owner/login)"""
-        # TODO: Implement logic for ownerLogin
+        # Implement logic for owner_login in derived class
         pass
+
     @abstractmethod
-    def ownerLogout(self, event, context, cache):
+    def owner_logout(self, event, context, cache):
         """Invalidate session token (logout) (POST /v1/owner/logout)"""
-        # TODO: Implement logic for ownerLogout
+        # Implement logic for owner_logout in derived class
         pass
+
     @abstractmethod
-    def ownerOnboarding(self, event, context, cache):
+    def owner_onboarding(self, event, context, cache):
         """Owner Registration / Onboarding (POST /v1/owner/onboarding)"""
-        # TODO: Implement logic for ownerOnboarding
+        # Implement logic for owner_onboarding in derived class
         pass
+
     @abstractmethod
-    def ownerSessionRefresh(self, event, context, cache):
+    def owner_session_refresh(self, event, context, cache):
         """Refresh a session token (POST /v1/owner/refresh)"""
-        # TODO: Implement logic for ownerSessionRefresh
+        # Implement logic for owner_session_refresh in derived class
         pass
+
     @abstractmethod
-    def ownerStorageDelete(self, event, context, cache):
+    def owner_storage_delete(self, event, context, cache):
         """Delete owner private storage (challenge/confirm) (DELETE /v1/owner/storage)"""
-        # TODO: Implement logic for ownerStorageDelete
+        # Implement logic for owner_storage_delete in derived class
         pass
+
     @abstractmethod
-    def ownerStorageGet(self, event, context, cache):
+    def owner_storage_get(self, event, context, cache):
         """Retrieve encrypted private data storage (GET /v1/owner/storage)"""
-        # TODO: Implement logic for ownerStorageGet
+        # Implement logic for owner_storage_get in derived class
         pass
+
     @abstractmethod
-    def ownerStorage(self, event, context, cache):
+    def owner_storage(self, event, context, cache):
         """Store or retrieve encrypted private data storage (POST /v1/owner/storage)"""
-        # TODO: Implement logic for ownerStorage
+        # Implement logic for owner_storage in derived class
         pass
+

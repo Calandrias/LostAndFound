@@ -89,6 +89,7 @@ components:
       type: object
     DeleteOwnerChallengeRequest:
       additionalProperties: false
+      description: Partial Request Model
       properties:
         kind:
           default: delete_owner_challange
@@ -104,6 +105,7 @@ components:
       type: object
     DeleteOwnerChallengeResponse:
       additionalProperties: false
+      description: Partial Response Model
       properties:
         challenge_text:
           description: 'Instruction: Type e.g ''DELETE-OWNER'' to confirm account
@@ -126,6 +128,7 @@ components:
       type: object
     DeleteOwnerConfirmRequest:
       additionalProperties: false
+      description: Partial Request Model
       properties:
         confirmation_text:
           description: User must type 'DELETE-OWNER' to confirm
@@ -143,6 +146,7 @@ components:
       type: object
     DeleteOwnerConfirmResponse:
       additionalProperties: false
+      description: Partial Response Model
       properties:
         deleted:
           description: True if account was deleted
@@ -160,6 +164,7 @@ components:
       type: object
     DeleteOwnerRequest:
       additionalProperties: false
+      description: Combined Request Model
       properties:
         data:
           discriminator:
@@ -194,6 +199,7 @@ components:
       type: object
     LoginChallengeRequest:
       additionalProperties: false
+      description: Partial Request Model
       properties:
         kind:
           default: login_challenge
@@ -212,6 +218,7 @@ components:
       type: object
     LoginChallengeResponseDataModel:
       additionalProperties: false
+      description: Partial Response Model
       properties:
         challenge:
           description: Challenge string the client must sign
@@ -233,6 +240,7 @@ components:
       type: object
     LoginRequest:
       additionalProperties: false
+      description: Combined Request Model
       properties:
         data:
           discriminator:
@@ -250,6 +258,7 @@ components:
       type: object
     LoginResponseRequest:
       additionalProperties: false
+      description: Partial Request Model
       properties:
         challenge_response:
           title: Challenge Response
@@ -266,6 +275,7 @@ components:
       type: object
     LoginSessionResponseDataModel:
       additionalProperties: false
+      description: Partial Response Model
       properties:
         expires_at:
           $ref: '#/components/schemas/Timestamp'
@@ -336,6 +346,7 @@ components:
       type: object
     OnboardingInitRequest:
       additionalProperties: false
+      description: Partial Request Model
       properties:
         kind:
           default: onboarding_init
@@ -354,6 +365,7 @@ components:
       type: object
     OnboardingInitResponse:
       additionalProperties: false
+      description: Partial Response Model
       properties:
         expires_at:
           $ref: '#/components/schemas/Timestamp'
@@ -375,6 +387,7 @@ components:
       type: object
     OnboardingPublicKeyRequest:
       additionalProperties: false
+      description: Partial Request Model
       properties:
         kind:
           default: onboarding_public_key
@@ -391,6 +404,7 @@ components:
       type: object
     OnboardingPublicKeyResponse:
       additionalProperties: false
+      description: Partial Response Model
       properties:
         created_at:
           $ref: '#/components/schemas/Timestamp'
@@ -407,6 +421,7 @@ components:
       type: object
     OnboardingRequest:
       additionalProperties: false
+      description: Combined Request Model
       properties:
         data:
           discriminator:
@@ -439,6 +454,7 @@ components:
       type: object
     OwnerResponseModel:
       additionalProperties: false
+      description: Combinded Owner Response Model
       properties:
         data:
           discriminator:
@@ -480,6 +496,7 @@ components:
       type: object
     OwnerStorageDeleteChallangeResponse:
       additionalProperties: false
+      description: Partial Response Model
       properties:
         challenge_text:
           description: 'Instruction: Type e.g ''DELETE-STORAGE'' to confirm account
@@ -502,6 +519,7 @@ components:
       type: object
     OwnerStorageDeleteChallengeRequest:
       additionalProperties: false
+      description: Partial Request Model
       properties:
         kind:
           default: storage_delete_challenge
@@ -517,6 +535,7 @@ components:
       type: object
     OwnerStorageDeleteConfirmRequest:
       additionalProperties: false
+      description: Partial Request Model
       properties:
         confirmation_text:
           description: User must type e.g. 'DELETE-STORAGE' to confirm
@@ -534,6 +553,7 @@ components:
       type: object
     OwnerStorageDeleteConfirmResponse:
       additionalProperties: false
+      description: Partial Response Model
       properties:
         deleted:
           description: True if storage was deleted
@@ -551,6 +571,7 @@ components:
       type: object
     OwnerStorageDeleteRequest:
       additionalProperties: false
+      description: Combined Request Model
       properties:
         data:
           discriminator:
@@ -568,6 +589,7 @@ components:
       type: object
     OwnerStorageResponse:
       additionalProperties: false
+      description: Partial Response Model
       properties:
         encrypted_storage:
           description: Base64-encoded, optionally gzip-compressed, encrypted private
@@ -590,6 +612,7 @@ components:
       type: object
     OwnerStorageWriteRequest:
       additionalProperties: false
+      description: Request Model
       properties:
         encrypted_storage:
           description: Base64-encoded, optionally gzip-compressed, encrypted private
@@ -602,6 +625,7 @@ components:
       type: object
     PasswordHash:
       additionalProperties: false
+      description: Pydantic model representing an Password Hash  with validation.
       properties:
         value:
           description: bcrypt hash string, 60 chars
@@ -629,6 +653,7 @@ components:
       type: object
     SessionRefreshRequest:
       additionalProperties: false
+      description: Partial Request Model
       properties:
         kind:
           default: session_refresh
@@ -640,6 +665,7 @@ components:
       type: object
     SessionRefreshResponse:
       additionalProperties: false
+      description: Partial Response Model
       properties:
         expires_at:
           $ref: '#/components/schemas/Timestamp'
