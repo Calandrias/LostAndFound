@@ -27,7 +27,7 @@ lint:
 
 ## Run unit tests with pytest
 test:
-	$(PYTHON) -m pytest
+	poetry run pytest
 
 ## Remove Python cache & test files
 clean:

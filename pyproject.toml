@@ -10,7 +10,7 @@ package-mode = false
 python = "^3.12"
 shared = { path = "runtime/shared", develop = true }
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 json5 = "*"
 prance = "*"
 openapi-spec-validator = "*"
