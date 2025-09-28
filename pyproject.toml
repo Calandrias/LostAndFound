@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "lostandfound"
+version = "0.1.0"
+description = "Common models, validation, and utilities for Lost & Found Lambdas"
+authors = ["Roland.Biendl@gmail.com"]
+license = "GNU AFFERO GENERAL PUBLIC LICENSE"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+shared = { path = "runtime/shared" }
+
+
+[tool.poetry.dev-dependencies]
+json5 = "*"
+prance = "*"
+openapi-spec-validator = "*"
+pytest = "*"
+pytest-cov = "*"
+coverage = "*"
+pylint = "*"
+moto = "*"
+

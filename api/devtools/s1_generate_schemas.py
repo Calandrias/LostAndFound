@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from helper import Config, patch_schema_all
+
+
 from shared.api import minimal_registry as registry
 
 # --------- UTILS AND HELPERS ---------

@@ -1,12 +1,13 @@
 [tool.poetry]
 name = "shared"
 version = "0.1.0"
-description = "Common models, validation, and utilities for Lost & Found Lambdas"
-authors = ["Dein Name <dein@email.de>"]
+description = "Shared layer for Lost & Found QR Platform Lambda functions"
+authors = ["Roland.Biendl@gmail.com"]
+license = "GNU AFFERO GENERAL PUBLIC LICENSE"
+packages = [{ include = "shared", from = "src" }]
 
 [tool.poetry.dependencies]
 python = "^3.12"
+pydantic = "^2.2.1"
+requests = "^2.31.0"
 
-[tool.poetry.dev-dependencies]
-pytest = "^7.0"
-mypy = "^1.0"
