@@ -1,11 +1,13 @@
-""" Unit tests for session store functionality."""
+"""Unit tests for session store functionality."""
 from typing import TYPE_CHECKING
 import logging
 import pytest
 import boto3
 from moto import mock_aws
-
+from botocore.exceptions import ClientError
 from shared.db.session.session_store import (
+    SessionDeleteError,
+    SessionRetrieveError,
     OwnerSessionHelper,
     VisitorSessionHelper,
 )
@@ -24,7 +26,7 @@ VISITOR_TABLE = "LostAndFound-VisitorSession"
 
 @pytest.fixture
 def ddb_tables():
-    """ Create mocked DynamoDB tables for testing."""
+    """Create mocked DynamoDB tables for OwnerSession and VisitorSession tests."""
     with mock_aws():
         ddb: DynamoDBServiceResource = boto3.resource("dynamodb")
         # Owner table
@@ -57,7 +59,7 @@ def ddb_tables():
 
 
 def test_owner_session_crud(ddb_tables):  # pylint: disable=redefined-outer-name # useage of fixture
-    """ Test creating, retrieving, and deleting an owner session. """
+    """Test creating, retrieving, and deleting an owner session."""
     helper = OwnerSessionHelper(table_name=OWNER_TABLE, ddb_resource=ddb_tables)
     logger.info("Testing owner session CRUD operations.")
     logger.debug(f"helper details: {helper}")
@@ -84,7 +86,7 @@ def test_owner_session_crud(ddb_tables):  # pylint: disable=redefined-outer-name
 
 
 def test_owner_session_onetime(ddb_tables):  # pylint: disable=redefined-outer-name # useage of fixture
-    """ Test creating a one-time owner session. """
+    """Test creating and retrieving a one-time owner session."""
     helper = OwnerSessionHelper(table_name=OWNER_TABLE, ddb_resource=ddb_tables)
     owner_hash = "owner_" + "B" * 43
     session = helper.create_owner_session(owner_hash=owner_hash, onetime=True)
@@ -101,7 +103,7 @@ def test_owner_session_onetime(ddb_tables):  # pylint: disable=redefined-outer-n
 
 
 def test_visitor_session_crud(ddb_tables):  # pylint: disable=redefined-outer-name # useage of fixture
-    """ Test creating, retrieving, and deleting a visitor session. """
+    """Test creating, retrieving, and deleting a visitor session."""
     helper = VisitorSessionHelper(table_name=VISITOR_TABLE, ddb_resource=ddb_tables)
     tag_code = "tag_" + "Z" * 32
     session = helper.create_visitor_session(tag_code=tag_code)
@@ -122,22 +124,88 @@ def test_visitor_session_crud(ddb_tables):  # pylint: disable=redefined-outer-na
 
 
 def test_owner_session_not_found(ddb_tables):  # pylint: disable=redefined-outer-name # useage of fixture
-    """ Test retrieving a non-existent owner session. """
+    """Test retrieving a non-existent owner session returns None."""
     helper = OwnerSessionHelper(table_name=OWNER_TABLE, ddb_resource=ddb_tables)
     fake_token = "doesnotexist"
     assert helper.get_owner_session(fake_token) is None
 
 
 def test_visitor_session_not_found(ddb_tables):  # pylint: disable=redefined-outer-name # useage of fixture
-    """ Test retrieving a non-existent visitor session. """
+    """Test retrieving a non-existent visitor session returns None."""
     helper = VisitorSessionHelper(table_name=VISITOR_TABLE, ddb_resource=ddb_tables)
     fake_token = "doesnotexist"
     assert helper.get_visitor_session(fake_token) is None
 
 
 def test_delete_nonexistent_session(ddb_tables):  # pylint: disable=redefined-outer-name # useage of fixture
-    """ Test deleting a non-existent session (should be no-op). """
+    """Test deleting a non-existent session does not raise an error."""
     helper = OwnerSessionHelper(table_name=OWNER_TABLE, ddb_resource=ddb_tables)
     fake_token = "nonexistent-session-token"
     # Should not raise (DynamoDB delete is idempotent)
     helper.delete_session(fake_token)
+
+
+def test_create_owner_session_invalid_owner_hash(ddb_tables):  # pylint: disable=redefined-outer-name # useage of fixture
+    """Test creating an owner session with invalid owner_hash raises Exception."""
+    helper = OwnerSessionHelper(table_name=OWNER_TABLE, ddb_resource=ddb_tables)
+    # owner_hash zu kurz/ungültig
+    with pytest.raises(Exception):
+        helper.create_owner_session(owner_hash="invalid")
+
+
+def test_create_visitor_session_invalid_tag_code(ddb_tables):  # pylint: disable=redefined-outer-name # useage of fixture
+    """Test creating a visitor session with invalid tag_code raises Exception."""
+    helper = VisitorSessionHelper(table_name=VISITOR_TABLE, ddb_resource=ddb_tables)
+    # tag_code zu kurz/ungültig
+    with pytest.raises(Exception):
+        helper.create_visitor_session(tag_code="invalid")
+
+
+def test_get_owner_session_invalid_token(ddb_tables):  # pylint: disable=redefined-outer-name # useage of fixture
+    """Test retrieving an owner session with invalid token raises SessionRetrieveError or returns None."""
+    helper = OwnerSessionHelper(table_name=OWNER_TABLE, ddb_resource=ddb_tables)
+    # Token mit ungültigem Format
+    assert helper.get_owner_session(12345) is None
+    with pytest.raises(SessionRetrieveError):
+        helper.get_owner_session("")
+
+
+def test_get_visitor_session_invalid_token(ddb_tables):  # pylint: disable=redefined-outer-name # useage of fixture
+    """Test retrieving a visitor session with invalid token raises SessionRetrieveError or returns None."""
+    helper = VisitorSessionHelper(table_name=VISITOR_TABLE, ddb_resource=ddb_tables)
+    assert helper.get_visitor_session(12345) is None
+    with pytest.raises(SessionRetrieveError):
+        helper.get_visitor_session("")
+
+
+def test_delete_session_client_error(mocker):
+    """Test that a ClientError in delete_session raises SessionDeleteError."""
+    helper = OwnerSessionHelper(table_name="tbl", ddb_resource=mocker.Mock())
+    mocker.patch.object(helper.table, "delete_item", side_effect=ClientError({"Error": {}}, "DeleteItem"))
+    with pytest.raises(SessionDeleteError):
+        helper.delete_session("token")
+
+
+def test_get_session_client_error(mocker):
+    """Test that a ClientError in get_session raises SessionRetrieveError."""
+    helper = OwnerSessionHelper(table_name="tbl", ddb_resource=mocker.Mock())
+    mocker.patch.object(helper.table, "get_item", side_effect=ClientError({"Error": {}}, "GetItem"))
+    Dummy = type("Dummy", (), {"model_fields": {}, "model_validate": staticmethod(lambda x: x)})
+    with pytest.raises(SessionRetrieveError):
+        helper.get_session("token", model=Dummy)
+
+
+def test_create_owner_session_client_error(mocker):
+    """Test that a ClientError in create_owner_session raises Exception."""
+    helper = OwnerSessionHelper(table_name="tbl", ddb_resource=mocker.Mock())
+    mocker.patch.object(helper.table, "put_item", side_effect=ClientError({"Error": {}}, "PutItem"))
+    with pytest.raises(Exception):
+        helper.create_owner_session(owner_hash="owner_" + "A" * 43)
+
+
+def test_create_visitor_session_client_error(mocker):
+    """Test that a ClientError in create_visitor_session raises Exception."""
+    helper = VisitorSessionHelper(table_name="tbl", ddb_resource=mocker.Mock())
+    mocker.patch.object(helper.table, "put_item", side_effect=ClientError({"Error": {}}, "PutItem"))
+    with pytest.raises(Exception):
+        helper.create_visitor_session(tag_code="tag_" + "Z" * 32)

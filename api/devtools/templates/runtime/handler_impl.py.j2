@@ -1,15 +1,38 @@
 # {{ tag_name | lower }}_handler_impl.py
-"""Handler implementation for the '{{ tag_name }}' tag."""
+"""Handler implementation for the '{{ tag_name }}' tag.
 
+THIS FILE IS AUTO-GENERATED AND WILL BE OVERWRITTEN ON EVERY GENERATION RUN.
+
+All user code blocks between
+    # -- BEGIN USER CODE: ... --
+and
+    # -- END USER CODE: ... --
+are always preserved.
+Unmatched user code blocks are collected at the end of the file to prevent data loss.
+
+IMPORTANT:
+- Each user code block starts with a '# DEFAULT USER CODE:' marker by default.
+- As long as this marker is present, your code will be replaced by the generator (e.g. after yapf/formatting).
+- If you change or remove the marker, your code will be considered 'custom' and will NOT be overwritten by future generations.
+- This mechanism ensures that formatting errors or accidental changes to default blocks are automatically corrected, while your own code is always preserved.
+"""
+
+from shared.api.response_model import APIResponseModel
 from {{ tag_name }}_ABC import {{ tag_name|capitalize }}HandlerABC
+
+# -- BEGIN USER CODE: imports --
+# DEFAULT USER CODE: Add your custom imports here
+# -- END USER CODE: imports --
 
 # pylint: disable=fixme # prototype file for implementation
 class {{ tag_name|capitalize }}Handler({{ tag_name|capitalize }}HandlerABC):
     # TODO: Implement logic for each method defined in the ABC class.
     {%- for endpoint in endpoints %}
 
-    def {{ endpoint.operationId | snake_case }}(self, event, context, cache):
+    def {{ endpoint.operationId | snake_case }}(self, event, context, cache) -> APIResponseModel:
         """{{ endpoint.summary }} ({{ endpoint.method }} {{ endpoint.path }})"""
-        # TODO: Implement logic for {{ endpoint.operationId | snake_case }}
+        # -- BEGIN USER CODE: {{ endpoint.operationId | snake_case }} --
+        # DEFAULT USER CODE: TODO: Implement logic for {{ endpoint.operationId | snake_case }}
+        # -- END USER CODE: {{ endpoint.operationId | snake_case }} --
     {%- endfor %}
 {{ '\n' -}}

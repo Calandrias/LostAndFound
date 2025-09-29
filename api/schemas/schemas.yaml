@@ -625,7 +625,9 @@ components:
       type: object
     PasswordHash:
       additionalProperties: false
-      description: Pydantic model representing an Password Hash  with validation.
+      description: "Pydantic model representing a password hash with validation.\n\
+        \nAttributes:\n    value (StrictStr): bcrypt hash string, 60 chars, pattern\
+        \ enforced."
       properties:
         value:
           description: bcrypt hash string, 60 chars

@@ -1,7 +1,11 @@
+"""
+Utility to print the folder structure of the repository, respecting .gitignore and showing comments from README.md or __init__.py.
+"""
 import os
 
 
 def get_gitignore_dirs(base_path="."):
+    """Parse .gitignore and return a set of ignored directories and files."""
     ignored = set()
     gitignore = os.path.join(base_path, ".gitignore")
     if os.path.exists(gitignore):
@@ -23,6 +27,7 @@ def get_gitignore_dirs(base_path="."):
 
 
 def get_dir_comment(directory):
+    """Get a comment string from README.md or __init__.py in the directory, if present."""
     candidates = ["README.md", "readme.md", "__init__.py"]
     for fname in candidates:
         fpath = os.path.join(directory, fname)
@@ -42,6 +47,7 @@ def get_dir_comment(directory):
 
 
 def print_tree(root, prefix="", ignored_dirs=None):
+    """Recursively print the directory tree, skipping ignored directories."""
     files = sorted(os.listdir(root))
     dirs = [f for f in files if os.path.isdir(os.path.join(root, f)) and (ignored_dirs is None or f not in ignored_dirs)]
     for idx, d in enumerate(dirs):

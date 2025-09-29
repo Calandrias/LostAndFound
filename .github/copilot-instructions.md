@@ -8,9 +8,6 @@
 ## Key Components & Structure
 - `frontend/`: Astro static app (not present in repo yet)
 - `runtime/`:
-  - `public/`: Finder-facing Lambda handlers (e.g., message creation, session start)
-  - `owner/`: Owner-facing Lambda handlers (e.g., reply, status update)
-  - `admin/`: Admin Lambdas (auditing, config)
   - `shared/`: Common models, validation, and utilities (e.g., `owner_model.py`, `session_store.py`)
 - `infra/`: AWS CDK stacks (Python) for deploying API Gateway, Lambdas, DynamoDB, Cognito, etc.
 - `models/`: OpenAPI specs and DB schemas

@@ -1,4 +1,9 @@
-""" API parser for OpenAPI and schema files. """
+"""
+API parser and OpenAPI/schema combiner for the Lost & Found platform.
+
+Combines OpenAPI and schema files, validates references, and groups endpoints by tag.
+All main functions and helpers are documented for maintainability.
+"""
 
 import os
 import sys
@@ -8,6 +13,7 @@ from collections import defaultdict
 import yaml
 from prance import BaseParser, ValidationError
 from helper import Config, extract_schema_refs, validation_error_printer, patch_schema_all
+from validation_utils import print_section, print_error_list, print_validation_summary
 
 
 def sort_components(components):
@@ -131,51 +137,70 @@ def validate_schema_references(api_spec: Dict[str, Any]) -> Dict[str, Any]:
     return validation_report
 
 
+def _check_request_body(operation: dict, operation_context: str, available_schemas: set, validation_report: dict):
+    """Check requestBody schema references for validity."""
+    if 'requestBody' not in operation:
+        return
+    validation_report['request_body_count'] += 1
+    request_refs = extract_schema_refs(operation['requestBody'], f"{operation_context}.requestBody")
+    for ref in request_refs:
+        if ref not in available_schemas:
+            validation_report['issues'].append({'type': 'missing_request_schema', 'operation': operation_context, 'reference': ref})
+            validation_report['valid'] = False
+
+
+def _check_responses(operation: dict, operation_context: str, available_schemas: set, validation_report: dict):
+    """Check response schema references for validity."""
+    if 'responses' not in operation:
+        return
+    for status_code, response in operation['responses'].items():
+        validation_report['response_count'] += 1
+        response_refs = extract_schema_refs(response, f"{operation_context}.responses.{status_code}")
+        for ref in response_refs:
+            if ref not in available_schemas:
+                validation_report['issues'].append({'type': 'missing_response_schema', 'operation': operation_context, 'response': status_code, 'reference': ref})
+                validation_report['valid'] = False
+
+
+def _check_discriminator(operation: dict, operation_context: str, available_schemas: set, validation_report: dict):
+    """Check for discriminator field in response schemas (Lost & Found specific)."""
+    if 'responses' not in operation:
+        return
+    for status_code, response in operation['responses'].items():
+        content = response.get('content', {})
+        for media_type, media_obj in content.items():
+            schema = media_obj.get('schema', {})
+            if isinstance(schema, dict) and 'discriminator' in schema:
+                disc = schema['discriminator']
+                if 'propertyName' not in disc or not disc['propertyName']:
+                    validation_report['discriminator_issues'].append({
+                        'context': f"{operation_context}.responses.{status_code}",
+                        'issue': 'Missing or empty discriminator propertyName'
+                    })
+                    validation_report['valid'] = False
+                # Optionally: check mapping completeness, etc.
+
+
 def validate_request_response_schemas(api_spec: Dict[str, Any]) -> Dict[str, Any]:
     """
     Validate that requestBody and response schemas reference valid schemas.
-    Focus on Lost & Found platform specific validation.
+    Focus on Lost & Found platform specific validation, including discriminator checks.
     """
     validation_report = {'valid': True, 'issues': [], 'request_body_count': 0, 'response_count': 0, 'discriminator_issues': []}
-
-    # Get available schemas
     available_schemas = set()
     if 'components' in api_spec and 'schemas' in api_spec['components']:
         available_schemas = set(f"#/components/schemas/{name}" for name in api_spec['components']['schemas'].keys())
-
-    # Check paths
     if 'paths' in api_spec:
         for path_name, path_item in api_spec['paths'].items():
             if not isinstance(path_item, dict):
                 continue
-
             for method, operation in path_item.items():
                 if not isinstance(operation, dict):
                     continue
-
                 operation_context = f"{method.upper()} {path_name}"
-
-                # Check requestBody
-                if 'requestBody' in operation:
-                    validation_report['request_body_count'] += 1
-                    request_refs = extract_schema_refs(operation['requestBody'], f"{operation_context}.requestBody")
-
-                    for ref in request_refs:
-                        if ref not in available_schemas:
-                            validation_report['issues'].append({'type': 'missing_request_schema', 'operation': operation_context, 'reference': ref})
-                            validation_report['valid'] = False
-
-                # Check responses
-                if 'responses' in operation:
-                    for status_code, response in operation['responses'].items():
-                        validation_report['response_count'] += 1
-                        response_refs = extract_schema_refs(response, f"{operation_context}.responses.{status_code}")
-
-                        for ref in response_refs:
-                            if ref not in available_schemas:
-                                validation_report['issues'].append({'type': 'missing_response_schema', 'operation': operation_context, 'response': status_code, 'reference': ref})
-                                validation_report['valid'] = False
-
+                _check_request_body(operation, operation_context, available_schemas, validation_report)
+                _check_responses(operation, operation_context, available_schemas, validation_report)
+                _check_discriminator(operation, operation_context, available_schemas, validation_report)
     return validation_report
 
 
@@ -184,7 +209,7 @@ def detailed_validation_report(validate_sepec: Dict[str, Any]) -> bool:
     Comprehensive validation before sending to Prance.
     Returns True if validation passes, False otherwise.
     """
-    print("\n🔍 Pre-Prance Validation:")
+    print_section("Pre-Prance Validation")
     print("=" * 50)
 
     # 1. Schema Reference Validation
@@ -193,11 +218,7 @@ def detailed_validation_report(validate_sepec: Dict[str, Any]) -> bool:
 
     if ref_validation['missing_refs']:
         print(f"❌ Found {len(ref_validation['missing_refs'])} missing schema references:")
-        for missing in ref_validation['missing_refs'][:5]:  # Show first 5
-            print(f"  • {missing['path']}: {missing['reference']}")
-            print(f"    Schema '{missing['schema_name']}' not found in components/schemas")
-        if len(ref_validation['missing_refs']) > 5:
-            print(f"  ... and {len(ref_validation['missing_refs']) - 5} more")
+        print_error_list([f"{m['path']}: {m['reference']} (Schema '{m['schema_name']}')" for m in ref_validation['missing_refs']])
     else:
         print(f"✅ All {ref_validation['total_refs_checked']} schema references valid")
 
@@ -207,28 +228,23 @@ def detailed_validation_report(validate_sepec: Dict[str, Any]) -> bool:
 
     if req_res_validation['issues']:
         print(f"❌ Found {len(req_res_validation['issues'])} request/response issues:")
-        for issue in req_res_validation['issues'][:5]:
-            if issue['type'] == 'missing_request_schema':
-                print(f"  • {issue['operation']}: Missing requestBody schema {issue['reference']}")
-            elif issue['type'] == 'missing_response_schema':
-                print(f"  • {issue['operation']} [{issue['response']}]: Missing response schema {issue['reference']}")
-        if len(req_res_validation['issues']) > 5:
-            print(f"  ... and {len(req_res_validation['issues']) - 5} more")
+        print_error_list([
+            f"{issue['operation']}: Missing requestBody schema {issue['reference']}"
+            if issue['type'] == 'missing_request_schema' else f"{issue['operation']} [{issue['response']}]: Missing response schema {issue['reference']}"
+            for issue in req_res_validation['issues']
+        ])
     else:
         print(f"✅ Validated {req_res_validation['request_body_count']} request bodies and {req_res_validation['response_count']} responses")
 
     # 3. Lost & Found specific validation
     if req_res_validation['discriminator_issues']:
         print("\n🏷️  Discriminator Issues (Lost & Found specific):")
-        for issue in req_res_validation['discriminator_issues']:
-            print(f"  ⚠️  {issue['context']}: {issue['issue']}")
+        print_error_list([f"{issue['context']}: {issue['issue']}" for issue in req_res_validation['discriminator_issues']])
 
     # Summary
     overall_valid = ref_validation['valid'] and req_res_validation['valid']
     print("\n📊 Validation Summary:")
-    print(f"  • Schema references: {'✅ PASS' if ref_validation['valid'] else '❌ FAIL'}")
-    print(f"  • Request/Response schemas: {'✅ PASS' if req_res_validation['valid'] else '❌ FAIL'}")
-    print(f"  • Overall: {'✅ READY FOR PRANCE' if overall_valid else '❌ NEEDS FIXING'}")
+    print_validation_summary(overall_valid, context="OpenAPI")
 
     return overall_valid
 
@@ -321,6 +337,6 @@ if __name__ == "__main__":
             for ep in endpoints:
                 print(f"   {ep['method']} {ep['path']} - {ep['operationId']} ({ep['summary']})")
 
-    except Exception as e:
+    except (ValidationError, RuntimeError) as e:
         print(f"\n❌ Prance validation/parsing failed: {e}")
         sys.exit(1)

@@ -2,9 +2,11 @@
 """Auto-generated Lmabda Hander for for Owner"""
 
 from Owner_handler_impl import OwnerHandler
+from shared.api.response_model import APIResponseModel, ErrorModel
+from shared.com.logging_utils import ProjectLogger
 
 handler_instance = OwnerHandler()
-
+logger = ProjectLogger("OwnerLambda").get_logger()
 
 def _extract_method_path(event):
     # REST API v1
@@ -32,12 +34,22 @@ routes = {
 # Simple in-memory cache (lives as long as Lambda is warm)
 cache = {}
 
+# pylint: disable=too-many-branches
 def lambda_handler(event, context):
     method, path = _extract_method_path(event)
     key = (method, path, event.get("queryStringParameters"))
     route = routes.get((method, path))
     if route is None:
         return {"statusCode": 404, "body": "Endpoint not found"}
-  
-    return response
-
+    try:
+        response = route(event, context, cache)
+        # Validate response type
+        if not isinstance(response, APIResponseModel):
+            logger.error(f"Handler for {method} {path} did not return APIResponseModel. Got: {type(response)} | Value: {response}")
+            error = ErrorModel(code="internal_error", message="Handler did not return a valid APIResponseModel.")
+            return APIResponseModel(success=False, error=error, data=None, allowedActions={}, meta=None).model_dump()
+        return response.model_dump() if hasattr(response, 'model_dump') else response
+    except Exception as exc:  # pylint: disable=broad-except # Catch all to prevent Lambda crash
+        logger.exception(f"Exception in handler for {method} {path}: {exc}")
+        error = ErrorModel(code="internal_error", message="An unexpected error occurred.")
+        return APIResponseModel(success=False, error=error, data=None, allowedActions={}, meta=None).model_dump()

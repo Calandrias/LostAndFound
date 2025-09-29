@@ -2,6 +2,7 @@
 """Auto-generated abstract base class for {{ tag_name }} tag handlers."""
 
 from abc import ABC, abstractmethod
+from shared.api.response_model import APIResponseModel
 
 # pylint: disable=unnecessary-pass # pass is okay for abstract class
 class {{ tag_name|capitalize }}HandlerABC(ABC):
@@ -11,7 +12,7 @@ class {{ tag_name|capitalize }}HandlerABC(ABC):
     {%- for endpoint in endpoints %}
 
     @abstractmethod
-    def {{ endpoint.operationId | snake_case }}(self, event, context, cache):
+    def {{ endpoint.operationId | snake_case }}(self, event, context, cache) -> APIResponseModel:
         """{{ endpoint.summary }} ({{ endpoint.method }} {{ endpoint.path }})"""
         # Implement logic for {{ endpoint.operationId | snake_case }} in derived class
         pass

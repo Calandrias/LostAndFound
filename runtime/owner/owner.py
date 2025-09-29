@@ -1,3 +1,7 @@
+# outdated code. needs to be transferred to onboarding_logic.py
+# disable pylint for complete file
+# pylint: skip-file
+
 import json
 import secrets
 import time

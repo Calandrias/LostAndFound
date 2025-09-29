@@ -9,11 +9,12 @@ from shared.com.logging_utils import ProjectLogger, SanitizingFormatter
 
 
 def random_logger() -> str:
+    """Return a random logger name for test isolation."""
     return "TestLogger_" + str(random.randint(0, 99999))
 
 
 def attach_memory_handler(logger):
-    """Attach a fresh StreamHandler(StringIO) and return its buffer."""
+    """Attach a fresh StreamHandler(StringIO) and return its buffer for test log capture."""
     stream = io.StringIO()
     for h in list(logger.handlers):
         logger.removeHandler(h)
@@ -39,6 +40,7 @@ def attach_memory_handler(logger):
         ("12345", False, None),
     ])
 def test_sanitize_identifier_patterns_and_prefixes(value, should_mask, prefix):
+    """Test that ProjectLogger.sanitize correctly masks or passes values based on prefix and length."""
     masked = ProjectLogger.sanitize(value)
     if should_mask and prefix:
         assert masked.startswith(prefix)
@@ -54,6 +56,7 @@ def test_sanitize_identifier_patterns_and_prefixes(value, should_mask, prefix):
 
 
 def test_sanitizing_formatter_unicode_and_prefix():
+    """Test that SanitizingFormatter handles unicode and known prefixes."""
     formatter = SanitizingFormatter()
     examples = ["MyÜñîcødé ✨ owner_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "foo tag_ABCDEFGHJKLMNOPQRSTU", "X sessiontok_123456789012345678901234567890ABCDEFG Z"]
     for msg in examples:
@@ -63,6 +66,7 @@ def test_sanitizing_formatter_unicode_and_prefix():
 
 
 def test_logger_level_dependency(monkeypatch):
+    """Test logger level and output depending on environment variables."""
     logger_name = random_logger()
     monkeypatch.setenv("STAGE", "prod")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
@@ -87,6 +91,7 @@ def test_logger_level_dependency(monkeypatch):
 
 
 def test_logger_sanitizer_on_args_with_prefixes():
+    """Test that logger output masks sensitive args with known prefixes."""
     logger_name = random_logger()
     logger = ProjectLogger(logger_name).get_logger()
     stream = attach_memory_handler(logger)
@@ -100,6 +105,7 @@ def test_logger_sanitizer_on_args_with_prefixes():
 
 
 def test_logger_singleton_and_handler():
+    """Test that ProjectLogger is a singleton and handlers can be cleared and reattached."""
     logger_name = random_logger()
     logger_a = ProjectLogger(logger_name).get_logger()
     logger_b = ProjectLogger(logger_name).get_logger()
@@ -114,6 +120,7 @@ def test_logger_singleton_and_handler():
 
 
 def test_formatter_custom_pattern_for_qr_prefix():
+    """Test that SanitizingFormatter can use a custom regex pattern for QR tag prefix."""
     pattern = r'\btag_[A-Za-z0-9]{8,}\b'
     formatter = SanitizingFormatter(pattern=pattern)
     teststring = "tag_ABCDEFGH tag_SHORT tag_ABCDEFGHIJKLMNOPQ"
@@ -123,6 +130,7 @@ def test_formatter_custom_pattern_for_qr_prefix():
 
 
 def test_formatter_args_tuple_with_owner_tag():
+    """Test that formatter masks args tuple with owner and tag values."""
     formatter = SanitizingFormatter()
     record = logging.LogRecord(name="foo",
                                level=logging.INFO,
@@ -138,12 +146,14 @@ def test_formatter_args_tuple_with_owner_tag():
 
 
 def test_logger_propagate_behavior():
+    """Test that ProjectLogger sets propagate to False."""
     logger_name = random_logger()
     logger = ProjectLogger(logger_name).get_logger()
     assert logger.propagate is False
 
 
 def test_project_logger_env_setup(monkeypatch):
+    """Test logger level setup based on STAGE and LOG_LEVEL environment variables."""
     logger_name = random_logger()
     monkeypatch.setenv("STAGE", "prod")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
@@ -158,6 +168,7 @@ def test_project_logger_env_setup(monkeypatch):
 
 
 def test_sanitize_staticmethod_public_with_tag_owner():
+    """Test that ProjectLogger.sanitize matches SanitizingFormatter.sanitize for known values."""
     val1 = "owner_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     val2 = "tag_ABCDEFGHJKLMNOPQRSTU"
     val3 = "sessiontok_123456789012345678901234567890ABCDEFG"
