@@ -1,4 +1,5 @@
 name: Pytest
+
 permissions:
   contents: read
 
@@ -10,16 +11,28 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.12"]
+
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements-dev.txt
-    - name: Run pytest unit tests on Lambda runtime code
-      run: |
-        pytest runtime
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
+
+      - name: Install dependencies
+        run: make install
+
+      - name: Make shared package editable
+        run: make editable
+
+      - name: Run pytest unit tests
+        run: make test
