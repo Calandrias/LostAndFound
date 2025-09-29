@@ -1,0 +1,12 @@
+# CodeQL configuration for Lost & Found
+# This file configures the CodeQL analysis for the repository.
+# Test files and directories are excluded from the analysis.
+
+paths-ignore:
+  - "**/tests/**"
+  - "**/test_*.py"
+  - "runtime/tests/**"
+  - "runtime/tests_shared/**"
+  - "runtime/tests_shared/test_*.py"
+  - "runtime/tests/shared/**"
+  - "runtime/tests/shared/test_*.py"
