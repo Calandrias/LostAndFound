@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 import logging
 import pytest
 import boto3
+import os
 from moto import mock_aws
 from botocore.exceptions import ClientError
 from shared.db.session.session_store import (
@@ -20,8 +21,6 @@ logger.setLevel(logging.DEBUG)
 
 OWNER_TABLE = "LostAndFound-OwnerSession"
 VISITOR_TABLE = "LostAndFound-VisitorSession"
-
-# disable assert warning, we are in tests
 
 
 @pytest.fixture
