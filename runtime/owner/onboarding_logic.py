@@ -9,8 +9,8 @@ import time
 from typing import Any, Optional, Dict
 from shared.db.owner.owner_store import OwnerStore
 from shared.db.owner.owner_model import Owner, State
-from shared.api.response_model import ApiResponseModel
-from shared.api.owner.api_owner_model import OwnerOnboardingRequest, OwnerOnboardingResponse
+from shared.api.response_model import APIResponseModel
+from shared.api.owner.api_owner_model import OnboardingRequest, OnboardingInitResponse
 
 ddb = OwnerStore()
 
@@ -36,7 +36,7 @@ def onboarding_logic(event: Dict[str, Any], logger: Any, cache: Optional[Dict[st
         if event.get("httpMethod") != "POST":
             return {"statusCode": 405, "body": json.dumps({"message": "Method Not Allowed"})}
 
-        req = OwnerOnboardingRequest.parse_raw(event["body"])
+        req = OnboardingRequest.parse_raw(event["body"])
         logger.append_keys(owner_hash=req.user_hash)
 
         # Check if Owner exists
@@ -59,7 +59,7 @@ def onboarding_logic(event: Dict[str, Any], logger: Any, cache: Optional[Dict[st
             status=State.ONBOARDING)
         ddb.put_owner(owner)
 
-        resp = OwnerOnboardingResponse(success=True, session_token=session_token, random_entropy=random_entropy)
+        resp = OnboardingInitResponse(success=True, session_token=session_token, random_entropy=random_entropy)
         return {"statusCode": 201, "headers": {"Content-Type": "application/json"}, "body": resp.json()}
 
     except Exception as exc:
