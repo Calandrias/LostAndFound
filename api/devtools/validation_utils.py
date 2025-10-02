@@ -2,6 +2,8 @@
 Common validation and error reporting utilities for Lost & Found devtools.
 """
 from typing import List
+from importlib import import_module
+from pydantic import BaseModel, TypeAdapter
 
 
 def print_error_list(errors: List[str], max_items: int = 5):
@@ -22,22 +24,25 @@ def print_validation_summary(valid: bool, context: str = "Validation"):
     print(f" • Status: {'✅ PASS' if valid else '❌ FAIL'} [{context}]")
 
 
-def import_model_class(model_name, import_path):
-    """Importiert eine Modelklasse anhand des Importpfads."""
+def import_model_class(import_path):
+    """Imports a model class based on the import path."""
     if isinstance(import_path, dict):
         return import_path.get('class')
     try:
         modulename, classname = import_path.split(":")
-        from importlib import import_module
         module = import_module(modulename)
         return getattr(module, classname)
-    except Exception as e:
+    except (ImportError, AttributeError, ValueError):
+        # handle known import errors
+        return None
+    except Exception:  # pylint: disable=broad-exception-caught
+        # unexpected error
         return None
 
 
 def check_schema_generation(model_class, model_name, valid_models, validation_issues):
-    """Prüft, ob das Model eine gültige Pydantic-Schema-Definition erzeugt."""
-    from pydantic import BaseModel, TypeAdapter
+    """Checks if the model generates a valid Pydantic schema definition."""
+
     try:
         if isinstance(model_class, type) and issubclass(model_class, BaseModel):
             model_class.model_json_schema()
@@ -51,7 +56,7 @@ def check_schema_generation(model_class, model_name, valid_models, validation_is
 
 
 def check_response_discriminator(model_name, model_class, response_registry, validation_issues, response_models):
-    """Prüft, ob das Response-Model das 'kind'-Feld für den Discriminator enthält."""
+    """Checks if the response model contains the 'kind' field for the discriminator."""
     if model_name in response_registry:
         response_models.append(model_name)
         fields = getattr(model_class, 'model_fields', {})
@@ -60,7 +65,7 @@ def check_response_discriminator(model_name, model_class, response_registry, val
 
 
 def check_request_discriminator(model_name, model_class, request_registry, validation_issues, request_models):
-    """Prüft, ob das Request-Model und seine Submodelle das 'kind'-Feld für den Discriminator enthalten."""
+    """Checks if the request model and its submodels contain the 'kind' field for the discriminator."""
     if model_name in request_registry:
         request_models.append(model_name)
         fields = getattr(model_class, 'model_fields', {})
@@ -73,7 +78,7 @@ def check_request_discriminator(model_name, model_class, request_registry, valid
 
 
 def print_model_validation_summary(validation_issues, valid_models, response_models, request_models):
-    """Gibt eine Zusammenfassung der Modell-Validierung aus."""
+    """Prints a summary of model validation results."""
     if validation_issues:
         print("⚠️ Validation Issues:")
         for issue in validation_issues[:5]:
@@ -88,15 +93,14 @@ def print_model_validation_summary(validation_issues, valid_models, response_mod
 
 
 def generate_schema_for_model(model_class):
-    """Erzeugt das JSON-Schema für ein Model (Pydantic v2 kompatibel)."""
-    from pydantic import BaseModel, TypeAdapter
+    """create json schema for a model, Pydantic v2 compatible."""
     if isinstance(model_class, type) and issubclass(model_class, BaseModel):
         return model_class.model_json_schema()
     return TypeAdapter(model_class).json_schema()
 
 
 def collect_defs(schema, global_defs):
-    """Fügt $defs aus dem Modelschema in das globale Defs-Dict ein, prüft auf Konflikte."""
+    """Adds $defs from the model schema into the global defs dict, checking for conflicts."""
     if "$defs" in schema:
         for def_key, def_val in schema["$defs"].items():
             if def_key not in global_defs:
@@ -107,7 +111,7 @@ def collect_defs(schema, global_defs):
 
 
 def pretty_print_model_table(processed_models, columns=4):
-    """Gibt die Modelnamen tabellarisch aus."""
+    """Prints the model names in a tabular format."""
     for i in range(0, len(processed_models), columns):
         row = processed_models[i:i + columns]
         while len(row) < columns:

@@ -1,20 +1,24 @@
+"""Identifier models for Lost & Found platform."""
+
 from pydantic import Field, BaseModel, ConfigDict, StrictStr, StrictInt
 from typing import ClassVar, Literal
 
-from shared.minimal_registry import generic_model, owner_model
+from shared.minimal_registry import generic_model
 
 
 class StrictModel(BaseModel):
+    """Base model with strict validation for all fields."""
     model_config = ConfigDict(extra="forbid", from_attributes=True)
 
 
 class NoData(StrictModel):
+    """Model representing an empty payload."""
     kind: Literal["no_data"] = "no_data"
 
 
 @generic_model
 class OwnerHash(BaseModel):
-    """Hash for owner identifiers (must start with 'owner_')."""
+    """Model for owner hash identifier."""
     prefix: ClassVar[str] = "owner_"
     code_length: ClassVar[int] = 43
     pattern: ClassVar[str] = fr'^{prefix}[A-Za-z0-9_-]{{{code_length}}}$'
@@ -29,7 +33,7 @@ class OwnerHash(BaseModel):
 
 @generic_model
 class TagCode(BaseModel):
-    """Field for public QR tag codes (must start with 'tag_')."""
+    """Model for tag code identifier."""
     prefix: ClassVar[str] = "tag_"
     min_code: ClassVar[int] = 32
     max_code: ClassVar[int] = 64
@@ -45,7 +49,7 @@ class TagCode(BaseModel):
 
 @generic_model
 class SessionToken(BaseModel):
-    """Field for session tokens (must start with 'sessiontok_')."""
+    """Model for session token identifier."""
     prefix: ClassVar[str] = "sessiontok_"
     min_length: ClassVar[int] = 43
     max_length: ClassVar[int] = 86
@@ -61,7 +65,7 @@ class SessionToken(BaseModel):
 
 @generic_model
 class Timestamp(BaseModel):
-    """Unix timestamp (seconds since epoch)."""
+    """Model for timestamp value."""
     value: StrictInt = Field(
         ...,
         ge=1735689600,  # 2025-01-01
@@ -72,6 +76,7 @@ class Timestamp(BaseModel):
 
 @generic_model
 class PublicKey(BaseModel):
+    """Model for public key value."""
     pattern: ClassVar[str] = r'^-----BEGIN PUBLIC KEY-----(.|\n)+-----END PUBLIC KEY-----\n?$'
     min_length: ClassVar[int] = 272
     max_length: ClassVar[int] = 800

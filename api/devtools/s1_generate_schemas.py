@@ -10,7 +10,6 @@ from importlib import import_module
 import importlib.util
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional
-from pydantic import TypeAdapter, BaseModel
 import yaml
 from helper import Config, patch_schema_all, write_output_file
 from validation_utils import (print_section, print_error_list, print_validation_summary, import_model_class, check_schema_generation, check_response_discriminator,
@@ -46,6 +45,7 @@ def scan_directory_for_models(directory: str, recursive: bool = True) -> List[Pa
             except (ImportError, FileNotFoundError, AttributeError, SyntaxError) as e:
                 print(f"Warning: Could not import {py_file.name}: {type(e).__name__}: {e}")
             except Exception as e:  # pylint: disable=broad-exception-caught
+                # unexpected error, should be logged and investigated
                 print(f"Unexpected error while importing {py_file.name}: {type(e).__name__}: {e}")
     finally:
         sys.path = original_path
@@ -61,6 +61,10 @@ def safe_import(modulename: str, classname: str) -> Optional[Any]:
     except (ImportError, AttributeError, ModuleNotFoundError) as e:
         print(f"Error importing {modulename}:{classname} -> {type(e).__name__}: {e}")
         return None
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        # unexpected error
+        print(f"Unexpected error importing {modulename}:{classname}: {type(e).__name__}: {e}")
+        return None
 
 
 def get_models_from_registry() -> Dict[str, Any]:
@@ -69,6 +73,10 @@ def get_models_from_registry() -> Dict[str, Any]:
         return registry.get_registered_models()
     except ImportError:
         print("Warning: No registry found, scanning will not discover decorated models")
+        return {}
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        # unexpected error
+        print(f"Unexpected error accessing registry: {type(e).__name__}: {e}")
         return {}
 
 
@@ -80,14 +88,22 @@ def validate_models(validation_models: Dict[str, Any]) -> bool:
     request_models = []
     try:
         response_registry = getattr(registry, 'get_response_models', lambda: {})()
-    except (AttributeError, TypeError):
+    except (AttributeError, TypeError) as e:
+        print(f"Error accessing response_registry: {type(e).__name__}: {e}")
+        response_registry = {}
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        print(f"Unexpected error accessing response_registry: {type(e).__name__}: {e}")
         response_registry = {}
     try:
         request_registry = getattr(registry, 'get_request_models', lambda: {})()
-    except (AttributeError, TypeError):
+    except (AttributeError, TypeError) as e:
+        print(f"Error accessing request_registry: {type(e).__name__}: {e}")
+        request_registry = {}
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        print(f"Unexpected error accessing request_registry: {type(e).__name__}: {e}")
         request_registry = {}
     for model_name, import_path in validation_models.items():
-        model_class = import_model_class(model_name, import_path)
+        model_class = import_model_class(import_path)
         if model_class is None:
             validation_issues.append(f"Could not import {model_name}")
             continue
@@ -103,13 +119,17 @@ def process_model_sources(model_sources: Dict[str, Any], global_defs: OrderedDic
     """Process models for schema extraction, collect all $defs and merge conflicts."""
     processed_models = []
     for model_name, import_path in model_sources.items():
-        model_class = import_model_class(model_name, import_path)
+        model_class = import_model_class(import_path)
         if model_class is None:
             continue
         try:
             schema = generate_schema_for_model(model_class)
-        except Exception as e:
-            print(f"Error generating schema for {model_name}: {e}")
+        except (TypeError, ValueError) as e:
+            print(f"Error generating schema for {model_name}: {type(e).__name__}: {e}")
+            continue
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            # unexpected error
+            print(f"Unexpected error generating schema for {model_name}: {type(e).__name__}: {e}")
             continue
         collect_defs(schema, global_defs)
         global_defs[model_name] = schema
@@ -120,26 +140,26 @@ def process_model_sources(model_sources: Dict[str, Any], global_defs: OrderedDic
 # --------- MAIN SCRIPT ---------
 
 
-def load_and_combine_modelsources(config_obj) -> dict:
+def load_and_combine_modelsources(config_obj_local) -> dict:
     """Lädt und kombiniert Modelsourcen aus Registry und Config."""
     registry_models = get_models_from_registry()
-    model_sources_dict = {src["name"]: src["import"] for src in config_obj.get_all_modelsources() if "name" in src and "import" in src}
+    model_sources_dict_local = {src["name"]: src["import"] for src in config_obj_local.get_all_modelsources() if "name" in src and "import" in src}
     if registry_models:
         print(f"📦 Found {len(registry_models)} models from registry")
         combined_sources = dict(registry_models)
-        for name, path in model_sources_dict.items():
+        for name, path in model_sources_dict_local.items():
             if name not in combined_sources:
                 combined_sources[name] = path
     else:
-        print(f"📦 Found {len(model_sources_dict)} models from config")
-        combined_sources = model_sources_dict
+        print(f"📦 Found {len(model_sources_dict_local)} models from config")
+        combined_sources = model_sources_dict_local
     return combined_sources
 
 
-def validate_and_report(model_sources_dict: dict) -> bool:
+def validate_and_report(model_sources_dict_inner: dict) -> bool:
     """Validiert Modelle und gibt Ergebnis aus."""
     print_section("Validating models")
-    validation_result = validate_models(model_sources_dict)
+    validation_result = validate_models(model_sources_dict_inner)
     if not validation_result:
         print_error_list(["Validation completed with issues – see warnings above"])
     else:
@@ -147,14 +167,14 @@ def validate_and_report(model_sources_dict: dict) -> bool:
     return validation_result
 
 
-def generate_and_write_schema(model_sources_dict: dict, config_obj) -> int:
+def generate_and_write_schema(model_sources_dict_inner: dict, config_obj_local) -> int:
     """Generiert und schreibt das Schema, gibt die Anzahl der generierten Schemas zurück."""
     print_section("Generating schemas")
     global_defs = OrderedDict()
-    process_model_sources(model_sources_dict, global_defs)
+    process_model_sources(model_sources_dict_inner, global_defs)
     print_section("Patching schema for OpenAPI 3.x and dictify")
     combined_schema = patch_schema_all({"components": {"schemas": global_defs}})
-    schema_file_local = config_obj.get_path("schema_file")
+    schema_file_local = config_obj_local.get_path("schema_file")
     print_section("Writing output")
     write_output_file(schema_file_local, "# This file is auto-generated from Pydantic models. Do not edit by hand!\n\n" + yaml.dump(combined_schema, sort_keys=False))
     print(f"✅ Generated schema: {schema_file_local}")
@@ -162,12 +182,12 @@ def generate_and_write_schema(model_sources_dict: dict, config_obj) -> int:
     return len(global_defs)
 
 
-def print_summary(imported_files_list, model_sources_dict, num_schemas_int, validation_passed_bool):
+def print_summary(imported_files_list_local, model_sources_dict_local, num_schemas_int_local, validation_passed_bool):
     """Gibt eine Zusammenfassung der Ergebnisse aus."""
     print_section("Summary")
-    print(f" • Files imported: {len(imported_files_list)}")
-    print(f" • Models processed: {len(model_sources_dict)}")
-    print(f" • Schemas generated: {num_schemas_int}")
+    print(f" • Files imported: {len(imported_files_list_local)}")
+    print(f" • Models processed: {len(model_sources_dict_local)}")
+    print(f" • Schemas generated: {num_schemas_int_local}")
     print_validation_summary(validation_passed_bool, context="Models")
     if not validation_passed_bool:
         print_error_list(["Please review warnings and fix models if needed!"])
@@ -177,16 +197,16 @@ def print_summary(imported_files_list, model_sources_dict, num_schemas_int, vali
 if __name__ == "__main__":
     print("🚀 Schema Generator for Lost & Found Platform")
     print("=" * 60)
-    config_obj = Config.load("config.json5")
-    schema_file = config_obj.get_path("schema_file")
-    input_dir = config_obj.get_path("input_dir")
-    print(f"📁 Scanning directory: {input_dir}")
-    imported_files_list = scan_directory_for_models(str(input_dir), recursive=True)
-    print(f"✅ Imported {len(imported_files_list)} Python files")
-    model_sources_dict = load_and_combine_modelsources(config_obj)
-    if not model_sources_dict:
+    config_obj_main = Config.load("config.json5")
+    schema_file_main = config_obj_main.get_path("schema_file")
+    input_dir_main = config_obj_main.get_path("input_dir")
+    print(f"📁 Scanning directory: {input_dir_main}")
+    imported_files_list_main = scan_directory_for_models(str(input_dir_main), recursive=True)
+    print(f"✅ Imported {len(imported_files_list_main)} Python files")
+    model_sources_dict_main = load_and_combine_modelsources(config_obj_main)
+    if not model_sources_dict_main:
         print("❌ No models found – aborting")
         sys.exit(1)
-    VALIDATION_PASSED = validate_and_report(model_sources_dict)
-    num_schemas_int = generate_and_write_schema(model_sources_dict, config_obj)
-    print_summary(imported_files_list, model_sources_dict, num_schemas_int, VALIDATION_PASSED)
+    VALIDATION_PASSED = validate_and_report(model_sources_dict_main)
+    num_schemas_int_main = generate_and_write_schema(model_sources_dict_main, config_obj_main)
+    print_summary(imported_files_list_main, model_sources_dict_main, num_schemas_int_main, VALIDATION_PASSED)

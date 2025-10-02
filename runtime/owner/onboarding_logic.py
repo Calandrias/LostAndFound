@@ -9,7 +9,6 @@ import time
 from typing import Any, Optional, Dict
 from shared.db.owner.owner_store import OwnerStore
 from shared.db.owner.owner_model import Owner, State
-from shared.api.response_model import APIResponseModel
 from shared.api.owner.api_owner_model import OnboardingRequest, OnboardingInitResponse
 
 ddb = OwnerStore()
@@ -27,16 +26,19 @@ def onboarding_logic(event: Dict[str, Any], logger: Any, cache: Optional[Dict[st
     Args:
         event (Dict[str, Any]): The Lambda event (API Gateway proxy event).
         logger (Any): Logger instance for logging (must support .info/.exception/.append_keys).
-        cache (Optional[Dict[str, Any]]): Optional cache dict for dependency injection/testing.
+        cache (Optional[Dict[str, Any]]): Optional cache dict for dependency injection/testing. (unused, required for interface)
     Returns:
         Dict[str, Any]: API Gateway-compatible response dict.
     """
+
     logger.info(f"Event: {json.dumps(event)}")
+    # touch cache to avoid unused argument pylint warning
+    _ = cache
     try:
         if event.get("httpMethod") != "POST":
             return {"statusCode": 405, "body": json.dumps({"message": "Method Not Allowed"})}
 
-        req = OnboardingRequest.parse_raw(event["body"])
+        req = OnboardingRequest.model_validate_json(event["body"])
         logger.append_keys(owner_hash=req.user_hash)
 
         # Check if Owner exists
@@ -62,6 +64,10 @@ def onboarding_logic(event: Dict[str, Any], logger: Any, cache: Optional[Dict[st
         resp = OnboardingInitResponse(success=True, session_token=session_token, random_entropy=random_entropy)
         return {"statusCode": 201, "headers": {"Content-Type": "application/json"}, "body": resp.json()}
 
-    except Exception as exc:
-        logger.exception("Error during owner onboarding")
+    except (ValueError, KeyError, TypeError) as exc:
+        logger.exception(f"Known error during owner onboarding: {type(exc).__name__}: {exc}")
+        return {"statusCode": 400, "body": json.dumps({"message": "Bad request"})}
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        # unexpected error
+        logger.exception("Unexpected error during owner onboarding")
         return {"statusCode": 500, "body": json.dumps({"message": "Internal server error"})}

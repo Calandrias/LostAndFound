@@ -1,5 +1,5 @@
 # {{ tag_name | lower }}_lambda_handler.py
-"""Auto-generated Lmabda Hander for for {{ tag_name }}"""
+"""Auto-generated Lambda Handler for {{ tag_name }}."""
 
 from {{ tag_name }}_handler_impl import {{ tag_name|capitalize }}Handler
 from shared.api.response_model import APIResponseModel, ErrorModel
@@ -9,6 +9,7 @@ handler_instance = {{ tag_name|capitalize }}Handler()
 logger = ProjectLogger("{{ tag_name|capitalize }}Lambda").get_logger()
 
 def _extract_method_path(event):
+    """Extract the HTTP method and path from the event object."""
     # REST API v1
     if "httpMethod" in event and "path" in event:
         return event["httpMethod"], event["path"]
@@ -30,6 +31,7 @@ cache = {}
 
 # pylint: disable=too-many-branches
 def lambda_handler(event, context):
+    """Main AWS Lambda handler for {{ tag_name }} operations."""
     method, path = _extract_method_path(event)
     key = (method, path, event.get("queryStringParameters"))
     route = routes.get((method, path))

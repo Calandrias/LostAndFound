@@ -1,3 +1,5 @@
+"""Logging utilities for Lost & Found platform."""
+
 import os
 import logging
 import re
@@ -7,9 +9,10 @@ PROTECTED_PREFIXES = ("owner_", "tag_", "sessiontok_")
 
 
 def mask_sensitive_patterns(text: str) -> str:
-    """Sanitize all sensitive owner/tag/session identifiers in given text."""
+    """Mask sensitive patterns in a given text string."""
 
     def replacer(match):
+        """Replace matched sensitive pattern with a mask."""
         word = match.group(0)
         for prefix in PROTECTED_PREFIXES:
             if word.startswith(prefix):
@@ -29,15 +32,16 @@ class SanitizingFormatter(logging.Formatter):
     """ Custom formatter that sanitizes sensitive information in log messages."""
 
     def __init__(self, pattern=None, *args, **kwargs):
-
+        """Initialize logger with optional pattern and arguments."""
         self.sensitive_pattern = re.compile(pattern) if pattern else SENSITIVE_PATTERN
         super().__init__(*args, **kwargs)
 
     def sanitize(self, text: str) -> str:
-        """ Replace sensitive patterns in the text with a masked version."""
+        """Sanitize text by masking sensitive information."""
         return mask_sensitive_patterns(text)
 
     def format(self, record):
+        """Format log record for output."""
         # Mask message and args
         if record.args:
             record.msg = self.sanitize(str(record.msg))
@@ -48,9 +52,11 @@ class SanitizingFormatter(logging.Formatter):
 
 
 class ProjectLogger:
+    """Custom logger for Lost & Found platform."""
     _instances = {}
 
     def __new__(cls, name="LostAndFound"):
+        """Create a new logger instance."""
         if name not in cls._instances:
             instance = super().__new__(cls)
             instance._init_logger(name)
@@ -58,6 +64,7 @@ class ProjectLogger:
         return cls._instances[name]
 
     def _init_logger(self, name):
+        """Initialize the logger backend."""
         self.logger = logging.getLogger(name)
         if not self.logger.handlers:
             handler = logging.StreamHandler()
@@ -83,8 +90,10 @@ class ProjectLogger:
                     self.logger.setLevel(logging.INFO)
 
     def get_logger(self):
+        """Return the logger instance."""
         return self.logger
 
     @staticmethod
     def sanitize(text: str) -> str:
+        """Sanitize text by masking sensitive information (standalone function)."""
         return mask_sensitive_patterns(text)

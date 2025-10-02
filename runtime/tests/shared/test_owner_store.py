@@ -58,14 +58,18 @@ def test_put_and_get_owner(ddb_table):  # pylint: disable=redefined-outer-name #
     logger.debug(f"created owner: {owner}")
     try:
         store.put_owner(owner)
-    except Exception as e:
-        logger.error(f"unexpected put error: {e}")
+    except (ValueError, KeyError, TypeError) as e:
+        logger.error(f"known put error: {type(e).__name__}: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error(f"unexpected put error: {type(e).__name__}: {e}")
 
     loaded = None
     try:
         loaded = store.get_owner(owner.owner_hash.value)
-    except Exception as e:  # pylint disable=
-        logger.error(f"unexpected get error: {e}")
+    except (ValueError, KeyError, TypeError) as e:
+        logger.error(f"known get error: {type(e).__name__}: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error(f"unexpected get error: {type(e).__name__}: {e}")
 
     assert loaded is not None
     assert loaded.owner_hash == owner.owner_hash

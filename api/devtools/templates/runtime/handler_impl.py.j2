@@ -26,6 +26,7 @@ from {{ tag_name }}_ABC import {{ tag_name|capitalize }}HandlerABC
 
 # pylint: disable=fixme # prototype file for implementation
 class {{ tag_name|capitalize }}Handler({{ tag_name|capitalize }}HandlerABC):
+    """Concrete implementation of {{ tag_name|capitalize }}HandlerABC for {{ tag_name }} tag operations."""
     # TODO: Implement logic for each method defined in the ABC class.
     {%- for endpoint in endpoints %}
 

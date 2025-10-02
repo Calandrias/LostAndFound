@@ -162,13 +162,13 @@ def _check_responses(operation: dict, operation_context: str, available_schemas:
                 validation_report['valid'] = False
 
 
-def _check_discriminator(operation: dict, operation_context: str, available_schemas: set, validation_report: dict):
+def _check_discriminator(operation: dict, operation_context: str, validation_report: dict):
     """Check for discriminator field in response schemas (Lost & Found specific)."""
     if 'responses' not in operation:
         return
     for status_code, response in operation['responses'].items():
         content = response.get('content', {})
-        for media_type, media_obj in content.items():
+        for _, media_obj in content.items():
             schema = media_obj.get('schema', {})
             if isinstance(schema, dict) and 'discriminator' in schema:
                 disc = schema['discriminator']
@@ -200,7 +200,7 @@ def validate_request_response_schemas(api_spec: Dict[str, Any]) -> Dict[str, Any
                 operation_context = f"{method.upper()} {path_name}"
                 _check_request_body(operation, operation_context, available_schemas, validation_report)
                 _check_responses(operation, operation_context, available_schemas, validation_report)
-                _check_discriminator(operation, operation_context, available_schemas, validation_report)
+                _check_discriminator(operation, operation_context, validation_report)
     return validation_report
 
 
@@ -329,7 +329,7 @@ if __name__ == "__main__":
     try:
         tags = load_openapi_by_tag(str(temp_file))
 
-        print(f"\n✅ Prance validation passed!")
+        print("\n✅ Prance validation passed!")
         print(f"📊 Found {sum(len(endpoints) for endpoints in tags.values())} endpoints in {len(tags)} tags")
 
         for tag, endpoints in tags.items():
