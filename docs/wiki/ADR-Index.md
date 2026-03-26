@@ -1,63 +1,60 @@
-# Architecture Decision Records (Index)
+# ADR Index
 
-List of accepted decisions. New proposals are added as PRs under `docs/adr/`.
+> Architecture Decision Records are stored in `docs/adr/`.  
+> This index provides a summary and status overview.
 
-## Status Legend
-- ✅ **Accepted** - Decision is approved and being implemented
-- 🟡 **Proposed** - Under discussion/review
-- ❌ **Deprecated** - Superseded by newer decisions
+---
 
-## Current ADRs
+## Active ADRs
 
-### Authentication & Authorization
-- **ADR-001**: ✅ Authentication via Cognito with minimal scopes (use sub only; email optional at "lost")
+| ADR | Title | Status | Date |
+|-----|-------|--------|------|
+| ADR-001 | Use DynamoDB as primary data store | ✅ Accepted | – |
+| ADR-002 | Privacy-first: no email/name required | ✅ Accepted | – |
+| ADR-003 | owner_hash as pseudonymous identifier | ✅ Accepted | – |
+| ADR-004 | Lambda + API Gateway over containers | ✅ Accepted | – |
+| ADR-005 | AWS CDK (Python) as IaC framework | ✅ Accepted | – |
+| ADR-006 | Mono-repo structure | ✅ Accepted | – |
+| ADR-007 | SRP (RFC 5054) vs Cognito → SRP | ✅ Accepted | – |
+| ADR-008 | Key derivation parameters (PBKDF2) | 🔲 To be written | – |
+| ADR-009 | E2EE roadmap (Phase 1→3) | 🔲 To be written | – |
+| ADR-010 | Frontend stack (Astro + Preact) | 🔲 To be written | – |
 
-### Data & Storage  
-- **ADR-002**: ✅ Data in DynamoDB with TTL; no mandatory personal fields
-- **ADR-005**: ✅ Optional real-time over WebSocket; default polling for MVP
+---
 
-### Infrastructure
-- **ADR-003**: ✅ Hosting model: S3 + CloudFront for frontend; API Gateway + Lambda for backend
+## New ADRs (from v2 refactor)
 
-### Security
-- **ADR-004**: ✅ Anti-abuse: One-Time Tokens, rate-limiting, soft CAPTCHA
+| ADR | Title | Status | Date |
+|-----|-------|--------|------|
+| ADR-011 | AWS Lambda Powertools as routing/validation framework | ✅ Accepted | 2026-03-26 |
+| ADR-012 | 3-stack CDK layout (Database / API / UI) | ✅ Accepted | 2026-03-26 |
+| ADR-013 | CloudFront + S3 OAC for frontend (no public bucket) | ✅ Accepted | 2026-03-26 |
+| ADR-014 | OpenAPI spec as generated output (not maintained input) | ✅ Accepted | 2026-03-26 |
+| ADR-015 | GitHub Actions OIDC for AWS auth (no static keys) | ✅ Accepted | 2026-03-26 |
+| ADR-016 | Zone-based mypy strictness (strict own code, overrides for 3rd party) | ✅ Accepted | 2026-03-26 |
+| ADR-017 | Lambda Layer build without Docker (manylinux wheels + pip --only-binary) | ✅ Accepted | 2026-03-26 |
 
-### Payments
-- **ADR-006**: 🟡 Optional payments via hosted payment links; receipts via PSP
+---
 
-## ADR Template
-Copy this template for new ADRs in `docs/adr/ADR-XXX-title.md`:
+## Decision: No Cognito (ADR-007)
 
-```markdown
-# ADR-XXX: Title
+Cognito requires an email address or phone number for account creation, which directly
+violates the Zero-Knowledge privacy principle of this platform. SRP (RFC 5054) with
+PBKDF2-HMAC-SHA256 key derivation is implemented entirely in the Lambda layer.
+This keeps the server from ever seeing plaintext credentials or real identifiers.
 
-- **Status**: Proposed/Accepted/Deprecated
-- **Date**: YYYY-MM-DD
-- **Deciders**: @username(s)
+## Decision: Powertools over custom routing (ADR-011)
 
-## Context
-Brief description of the problem or decision that needs to be made.
+The v1 codegen pipeline (3 scripts + ABC + handler impl + templates) is replaced
+by AWS Lambda Powertools `APIGatewayRestResolver` + `Router`. Benefits:
+- Pydantic validation is automatic (no manual `model_validate_json`)
+- OpenAPI spec is generated directly from route definitions
+- Standard observability (Logger, Tracer, Metrics) is built-in
+- No generated code to maintain or regenerate
 
-## Options considered
-1. Option A: Description and trade-offs
-2. Option B: Description and trade-offs  
-3. Option C: Description and trade-offs
+## Decision: 3-stack CDK layout (ADR-012)
 
-## Decision
-Chosen option and rationale.
-
-## Consequences
-- **Positive**: Benefits of this decision
-- **Negative**: Drawbacks or risks
-- **Neutral**: Other implications
-
-## Links
-- Related ADRs
-- External references
-- Implementation PRs
-```
-
-## Navigation
-- [← Roadmap](Roadmap.md) | [Operations →](Operations.md)
-- [🏠 ADR Directory](../adr/) - Actual ADR files
-- [↑ Back to README](../../README.md)
+`DatabaseStack` is isolated from `ApiStack` so that `cdk destroy` on the API
+never risks touching data. `RemovalPolicy.RETAIN` on all tables provides a
+second layer of protection. `UIStack` is independent to allow frontend-only
+redeployments without touching backend resources.
