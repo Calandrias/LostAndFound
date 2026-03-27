@@ -22,10 +22,10 @@ anywhere – GitHub Actions authenticates via **OIDC**.
 ```
 LostAndFoundDatabaseStack
     Owns all DynamoDB tables. RemovalPolicy.RETAIN on all.
-    ├── owner_table          PK: owner_hash
-    ├── tag_table            PK: tag_id
-    ├── owner_session_table  PK: session_token  TTL: expires_at
-    └── finder_session_table PK: session_token  TTL: expires_at
+    ├── owner_table           PK: owner_hash
+    ├── tag_table             PK: tag_id
+    ├── owner_session_table   PK: session_token  TTL: expires_at
+    └── visitor_session_table PK: session_token  TTL: expires_at
 
 LostAndFoundApiStack
     Owns API Gateway REST API + Lambda functions + Shared Layer.
@@ -33,7 +33,7 @@ LostAndFoundApiStack
     ├── RestApi (API Gateway)  – single gateway, eu-central-1
     ├── SharedLayer            – pydantic, powertools, cryptography, srptools
     ├── owner Lambda           → /v1/owner/{proxy+}
-    ├── finder Lambda          → /v1/finder/{proxy+}
+    ├── visitor Lambda         → /v1/visitor/{proxy+}
     └── tag Lambda             → /v1/tag/{proxy+}
 
 LostAndFoundUIStack
@@ -101,12 +101,12 @@ LostAndFound/
 │   │       ├── account.py      # GET/DELETE /v1/owner
 │   │       └── storage.py      # GET/POST/DELETE /v1/owner/storage
 │   │
-│   ├── finder/                 # Finder Lambda (new)
+│   ├── visitor/                # Visitor Lambda (new)
 │   │   ├── app.py
 │   │   ├── lambda_handler.py
 │   │   └── routes/
-│   │       ├── session.py      # POST /v1/finder/session
-│   │       └── message.py      # POST /v1/finder/message
+│   │       ├── session.py      # POST /v1/visitor/session
+│   │       └── message.py      # POST /v1/visitor/message
 │   │
 │   ├── tag/                    # Tag Lambda
 │   │   ├── app.py
@@ -118,7 +118,7 @@ LostAndFound/
 │   └── tests/
 │       ├── unit/
 │       │   ├── owner/          # Handler tests via app.resolve() + moto
-│       │   ├── finder/
+│       │   ├── visitor/
 │       │   ├── tag/
 │       │   └── shared/         # existing tests – keep as-is
 │       ├── contract/
@@ -189,12 +189,12 @@ HTTP Request
     │
     ▼
 API Gateway REST API  (single gateway, stage = dev | prod)
-    ├── /v1/owner/{proxy+}   ──►  owner Lambda  ──►  Powertools Router
-    │                                                ├── POST /v1/owner/onboarding
-    │                                                ├── POST /v1/owner/login
-    │                                                └── ...
-    ├── /v1/finder/{proxy+}  ──►  finder Lambda ──►  Powertools Router
-    └── /v1/tag/{proxy+}     ──►  tag Lambda    ──►  Powertools Router
+    ├── /v1/owner/{proxy+}    ──►  owner Lambda   ──►  Powertools Router
+    │                                                  ├── POST /v1/owner/onboarding
+    │                                                  ├── POST /v1/owner/login
+    │                                                  └── ...
+    ├── /v1/visitor/{proxy+}  ──►  visitor Lambda ──►  Powertools Router
+    └── /v1/tag/{proxy+}      ──►  tag Lambda     ──►  Powertools Router
 ```
 
 CDK definition (per Lambda, in `api_stack.py`):
@@ -346,6 +346,8 @@ Bonus: add `boto3-stubs[dynamodb,s3,kms]` as dev dependency for full DynamoDB ty
 | S3 public bucket (direct) | S3 private + CloudFront OAC |
 | pylint | ruff + mypy |
 | No API Gateway in CDK | RestApi with proxy routing |
+| `finder` Lambda + `/v1/finder/` routes | `visitor` Lambda + `/v1/visitor/` routes |
+| `finder_session_table` | `visitor_session_table` |
 
 ## What is Preserved from v1
 

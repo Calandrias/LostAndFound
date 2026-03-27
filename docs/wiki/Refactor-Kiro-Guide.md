@@ -28,7 +28,7 @@ Follow the steps in order. Each step is independently mergeable.
 
 Merge the following existing stacks into one:
 - `infra/stacks/owner_stack.py` → `owner_table`
-- `infra/stacks/session_stack.py` → `owner_session_table` + `finder_session_table`
+- `infra/stacks/session_stack.py` → `owner_session_table` + `visitor_session_table`
 - `infra/stacks/tag_stack.py` → `tag_table`
 
 All tables keep their existing configuration (PK, BillingMode, RemovalPolicy, TTL).
@@ -51,7 +51,7 @@ Replace the current public S3 bucket with:
   - CORS preflight options (allow all origins for now, tighten in prod)
   - `StageOptions` with `MethodLoggingLevel.INFO`
 - Add helper method `_add_proxy(root, prefix, fn)` that creates `/{prefix}` and `/{prefix}/{proxy+}` with `ANY` method → `LambdaIntegration`
-- Wire: `/v1/owner`, `/v1/finder`, `/v1/tag` (finder Lambda does not exist yet, create placeholder)
+- Wire: `/v1/owner`, `/v1/visitor`, `/v1/tag` (visitor Lambda does not exist yet, create placeholder)
 - Add `CfnOutput` for the API URL
 
 ### 1d. Update `infra/stacks/__init__.py`
@@ -76,7 +76,7 @@ ui = UIStack(app, f"LostAndFoundUIStack-{stage}", env=env, stage=stage)
 
 Create `infra/tests/test_stacks.py` with tests for:
 - `ResourceCountIs("AWS::ApiGateway::RestApi", 1)`
-- `ResourceCountIs("AWS::Lambda::Function", 3)` (owner, finder, tag)
+- `ResourceCountIs("AWS::Lambda::Function", 3)` (owner, visitor, tag)
 - All 4 DynamoDB tables exist
 - Session tables have `TimeToLiveSpecification` enabled (privacy requirement)
 - S3 bucket has `BlockPublicAcls: true`
@@ -200,14 +200,19 @@ def test_onboard_duplicate_returns_409():
 
 ---
 
-## Step 3 – Create Finder Lambda (New)
+## Step 3 – Create Visitor Lambda (New)
 
-**Goal**: Create the finder Lambda from scratch following the same pattern.
+**Goal**: Create the visitor Lambda from scratch following the same pattern.
 
-- Create `runtime/finder/app.py`, `lambda_handler.py`
-- Create `runtime/finder/routes/session.py` – `POST /v1/finder/session` (stub, 501)
-- Create `runtime/finder/routes/message.py` – `POST /v1/finder/message` (stub, 501)
-- Add unit tests: `runtime/tests/unit/finder/`
+> **Note**: The role is named `visitor` (not `finder`) to avoid trademark proximity
+> to "FindR – The QR Code Network" and to better reflect the actual use case:
+> anyone scanning a tag is a visitor, not necessarily a finder.
+
+- Create `runtime/visitor/app.py`, `lambda_handler.py`
+- Create `runtime/visitor/routes/session.py` – `POST /v1/visitor/session` (stub, 501)
+- Create `runtime/visitor/routes/message.py` – `POST /v1/visitor/message` (stub, 501)
+- Add unit tests: `runtime/tests/unit/visitor/`
+- DynamoDB table: `visitor_session_table` (rename from `finder_session_table` if present)
 
 ---
 
@@ -228,7 +233,7 @@ def test_onboard_duplicate_returns_409():
 **Goal**: Replace `api/devtools/` with a single clean export script.
 
 - Create `devtools/export_openapi.py`
-- Import `app` from `owner`, `finder`, `tag`
+- Import `app` from `owner`, `visitor`, `tag`
 - Merge OpenAPI schemas from all three apps
 - Write to `api/openapi.yaml` and `api/openapi.json`
 - Add contract test: `runtime/tests/contract/test_openapi_contract.py`
@@ -265,6 +270,13 @@ ignore_missing_imports = true
 disallow_untyped_defs = false
 ```
 
+### CDK Assertion tests – visitor check
+
+In `infra/tests/test_stacks.py`, ensure:
+- Lambda function for `visitor` exists (not `finder`)
+- Route `/v1/visitor/{proxy+}` is wired
+- `visitor_session_table` has TTL enabled
+
 ---
 
 ## Step 7 – Cleanup
@@ -274,6 +286,8 @@ disallow_untyped_defs = false
 - Review `docs/wiki/Notes to refine/` – promote or delete
 - Update `docs/wiki/Architecture.md` to point to `Architecture-v2.md`
 - Update `docs/wiki/ADR-Index.md` (see separate file)
+- Verify: no remaining occurrences of `finder` (except in git history)
+  - `grep -r "finder" runtime/ infra/ api/ --include="*.py" --include="*.yaml"`
 
 ---
 
@@ -284,8 +298,10 @@ These must remain true after every step:
 1. `cdk synth` succeeds
 2. `pytest runtime/tests/shared/` passes (existing shared tests)
 3. `owner_hash`, `session_token`, `tag_id` formats are unchanged
-4. All DynamoDB table names are unchanged (no data migration needed)
+4. All DynamoDB table names are unchanged (no data migration needed) –
+   **exception**: `finder_session_table` → `visitor_session_table` (v2 rename, no existing data)
 5. Privacy: session tables always have TTL attribute set
 6. No Cognito, no static AWS keys, no real email addresses in any model
 7. All code, docs, and commits in English
 8. Conventional Commits format
+9. No occurrences of `finder`/`Finder` in runtime code, infra, or API routes
